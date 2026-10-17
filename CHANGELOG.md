@@ -2,6 +2,8 @@
 
 ## 2026-10-17
 
+- On notes with lots of versions, the oldest and newest versions are now as easy to pick out as the ones in the middle. The magnified part of the timeline also holds still while you move across it, so you land on the version you're aiming at, and it slides along once you move past it.
+
 - History and Co-writer now have their own buttons at the top right of the window: a clock and a chat bubble. Each icon fills in while its panel is open. The buttons stay in the same place when Co-writer is open, so the button you used to open something is the one that closes it. Co-writer slides in underneath them. The New conversation button only shows once a conversation has started.
 
 - Version history is now a timeline along the bottom of the note instead of a list on the right, so Co-writer stays open while you look back. Drag along it, or use ← and →, to step through versions. The note shows what each version changed. Co-writer's versions are marked in orange, and the days are labelled underneath. Restore and Back to now appear when you're on an earlier version. The timeline slides in and out gently, and the note glides to each change instead of jumping. On notes with lots of versions, the timeline magnifies around your pointer like the macOS Dock, so you can see and pick out the version you're pointing at.

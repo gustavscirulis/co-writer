@@ -14,7 +14,10 @@ import { useLensStrength } from "./use-lens-strength";
 import { useVersionTrack } from "./use-version-track";
 import {
   dayLabel,
+  focusAt,
+  holdFocus,
   isCrowded,
+  lensShape,
   magnify,
   nearestMark,
   timeLabel,
@@ -70,12 +73,13 @@ export function HistoryDock({ open, onExited }: HistoryDockProps) {
   const error = useHistoryError();
   const restoring = useHistoryRestoring();
   const track = useVersionTrack(open);
-  // `focus` is the pointer's last spot on the track, in percent; the lens eases out there.
-  const [hover, setHover] = useState<{ index: number; focus: number | null; active: boolean }>({
-    index: -1,
-    focus: null,
-    active: false,
-  });
+  // `pointer` is its last spot on the track, in percent, and `focus` the fractional version the lens centres on.
+  const [hover, setHover] = useState<{
+    index: number;
+    pointer: number | null;
+    focus: number | null;
+    active: boolean;
+  }>({ index: -1, pointer: null, focus: null, active: false });
   const strength = useLensStrength(hover.active);
   // A hidden window runs no transitions, so transitionend alone could leave the dock mounted.
   useEffect(() => {
@@ -88,10 +92,12 @@ export function HistoryDock({ open, onExited }: HistoryDockProps) {
   const base = useMemo(() => marks.map((mark) => mark.at), [marks]);
   // Only a crowded track needs the lens; with room to spare, hovering just highlights the tick.
   const crowded = useMemo(() => isCrowded(base, track.width), [base, track.width]);
+  const shape = useMemo(() => lensShape(base, track.width), [base, track.width]);
   const lens = crowded && hover.focus !== null ? strength : 0;
   const positions = useMemo(
-    () => (lens === 0 || hover.focus === null ? base : magnify(base, hover.focus, lens)),
-    [base, hover.focus, lens],
+    () =>
+      lens === 0 || hover.focus === null ? base : magnify(base, hover.focus, shape.peak, lens),
+    [base, hover.focus, shape.peak, lens],
   );
 
   const position = marks.findIndex((mark) => mark.version.id === selectedId);
@@ -101,7 +107,7 @@ export function HistoryDock({ open, onExited }: HistoryDockProps) {
   const shownDays = new Set(
     track.width ? visibleDays(marks, positions, (DAY_LABEL_WIDTH / track.width) * 100) : [],
   );
-  const pointerX = hover.focus === null ? null : (hover.focus / 100) * track.width;
+  const pointerX = hover.pointer === null ? null : (hover.pointer / 100) * track.width;
   const tip = marks[hover.index];
   const tipAt = positions[hover.index];
 
@@ -109,12 +115,20 @@ export function HistoryDock({ open, onExited }: HistoryDockProps) {
     const id = marks[index]?.version.id;
     if (id && id !== selectedId) selectVersion(id);
   };
-  // The lens is centred on the pointer, so the pointer's spot on the track is also its focus.
   const aim = (event: PointerEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const focus = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
-    const index = nearestMark(crowded ? magnify(base, focus) : base, focus);
-    setHover({ index, focus, active: true });
+    const pointer = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
+    if (!crowded) {
+      const index = nearestMark(base, pointer);
+      setHover({ index, pointer, focus: null, active: true });
+      return index;
+    }
+    // A lens still settling picks up where it was, rather than jumping under the pointer.
+    const held = hover.active || strength > 0 ? hover.focus : null;
+    const focus =
+      held === null ? focusAt(base, pointer, shape.peak) : holdFocus(base, held, pointer, shape);
+    const index = nearestMark(magnify(base, focus, shape.peak), pointer);
+    setHover({ index, pointer, focus, active: true });
     return index;
   };
 
