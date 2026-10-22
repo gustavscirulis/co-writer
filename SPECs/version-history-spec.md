@@ -66,5 +66,6 @@ Pruning runs on workspace open, after indexing. Per note:
 
 - Only the body is diffed; frontmatter changes don't show in the preview.
 - Deleted chunks render as raw markdown.
+- Tables diff their rendered cell text, so a formatting-only edit highlights the whole cell, and a formatting change alongside a text edit only marks the text. While the column count holds, columns compare by position (a renamed header stays one column). When it changes, they match by header, falling back to position if headers are blank or repeated. A moved column shows as removed and re-added.
 - Notes moved or renamed outside Writer lose their history link.
 - In git-tracked vaults, `.writer/history` shows up as untracked unless ignored.

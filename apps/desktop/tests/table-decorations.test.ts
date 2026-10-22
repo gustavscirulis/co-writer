@@ -5,6 +5,7 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
 import { GFM } from "@lezer/markdown";
 import {
+  diffCellMarkdown,
   parseTableCellInlineMarkdown,
   tableDecorations,
 } from "../src/components/editor-area/table-decorations";
@@ -162,5 +163,51 @@ describe("tableDecorations", () => {
     ].join("\n");
 
     expect(tableEstimate(longTable)).toBeGreaterThan(tableEstimate(table));
+  });
+});
+
+describe("diffCellMarkdown", () => {
+  const changed = (text: string) => ({
+    type: "element",
+    tag: "span",
+    className: "cm-changedText",
+    children: [{ type: "text", text }],
+  });
+  const removed = (text: string) => ({
+    type: "element",
+    tag: "del",
+    className: "cm-deletedText",
+    children: [{ type: "text", text }],
+  });
+
+  test("highlights only the words that changed and keeps removed words in place", () => {
+    expect(diffCellMarkdown("Land early", "Land late")).toEqual([
+      { type: "text", text: "Land " },
+      removed("early"),
+      changed("late"),
+    ]);
+  });
+
+  test("diffs the rendered text, so markdown syntax isn't split", () => {
+    expect(diffCellMarkdown("Land **early**", "Land **early**, then Alfama")).toEqual([
+      { type: "text", text: "Land " },
+      { type: "element", tag: "strong", children: [{ type: "text", text: "early" }] },
+      changed(", then Alfama"),
+    ]);
+  });
+
+  test("highlights the whole cell when only formatting changed", () => {
+    expect(diffCellMarkdown("early", "**early**")).toEqual([
+      {
+        type: "element",
+        tag: "span",
+        className: "cm-changedText",
+        children: [{ type: "element", tag: "strong", children: [{ type: "text", text: "early" }] }],
+      },
+    ]);
+  });
+
+  test("shows a cleared cell as struck-through text", () => {
+    expect(diffCellMarkdown("gone", "")).toEqual([removed("gone")]);
   });
 });

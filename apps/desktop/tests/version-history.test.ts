@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { invoke } from "@tauri-apps/api/core";
 import { getChunks } from "@codemirror/merge";
+import { EditorView } from "@codemirror/view";
 import {
   firstChangePosition,
   historyPreviewState,
@@ -55,6 +56,63 @@ describe("history preview", () => {
     expect(firstChangePosition(state)).toBeNull();
     const next = state.update({ changes: { from: 0, insert: "x" } }).state;
     expect(next.doc.toString()).toBe("# Title\n");
+  });
+
+  test("diffs a changed table against the table it was, and leaves unchanged tables alone", () => {
+    const kept = "| K |\n| - |\n| k |";
+    const state = historyPreviewState(
+      `| A | B |\n| - | - |\n| 1 | two |\n| 5 | 6 |\n\n${kept}\n`,
+      `Intro.\n\n| A | B |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |\n\n${kept}\n`,
+      () => "/n.md",
+    );
+    const diffs: unknown[] = [];
+    for (const source of state.facet(EditorView.decorations)) {
+      if (typeof source === "function") continue;
+      source.between(0, state.doc.length, (_from, _to, deco) => {
+        const widget = deco.spec.widget as { diff?: unknown } | undefined;
+        if (widget && "diff" in widget) diffs.push(widget.diff);
+      });
+    }
+    expect(diffs).toEqual([
+      {
+        columns: [
+          { before: 0, after: 0 },
+          { before: 1, after: 1 },
+        ],
+        rows: [
+          { kind: "same", r: 0, before: ["A", "B"] },
+          { kind: "changed", r: 1, before: ["1", "2"] },
+          { kind: "deleted", cells: ["3", "4"] },
+          { kind: "same", r: 2, before: ["5", "6"] },
+        ],
+      },
+      null,
+    ]);
+  });
+
+  test("leaves changed tables out of the prose diff, so the old table isn't repeated as raw markdown", () => {
+    const state = historyPreviewState(
+      "Intro.\n\n| A | New |\n| - | - |\n| 1 | x |\n",
+      "Intro.\n\n| A |\n| - |\n| 1 |\n",
+      () => "/n.md",
+    );
+    expect(getChunks(state)?.chunks).toHaveLength(0);
+    expect(firstChangePosition(state)).toBe(8);
+  });
+
+  test("shows every row of a table the version added as inserted", () => {
+    const state = historyPreviewState("Hi.\n\n| A |\n| - |\n| 1 |\n", "Hi.\n", () => "/n.md");
+    const kinds: string[] = [];
+    for (const source of state.facet(EditorView.decorations)) {
+      if (typeof source === "function") continue;
+      source.between(0, state.doc.length, (_from, _to, deco) => {
+        const widget = deco.spec.widget as
+          | { diff?: { rows: { kind: string }[] } | null }
+          | undefined;
+        widget?.diff?.rows.forEach((row) => kinds.push(row.kind));
+      });
+    }
+    expect(kinds).toEqual(["inserted", "inserted"]);
   });
 });
 

@@ -201,6 +201,129 @@ export function setAlign(m: TableModel, c: number, align: TableAlign): TableMode
   return { ...m, delimiter: withCells(m.delimiter, cells) };
 }
 
+/** One displayed column: its index in the previous version, the shown version, or both. */
+export type TableColumnDiff = { before?: number; after?: number };
+
+/** How one displayed row differs from the table's previous version, in display order. */
+export type TableRowDiff =
+  | { kind: "same" | "changed"; r: number; before: string[] }
+  | { kind: "inserted"; r: number }
+  | { kind: "deleted"; cells: string[] };
+
+export interface TableDiff {
+  columns: TableColumnDiff[];
+  rows: TableRowDiff[];
+}
+
+type Pairing = { a?: number; b?: number };
+
+/**
+ * Lines up `a` with `b`: equal keys match along their longest common
+ * subsequence, and unmatched entries between two matches pair up by position.
+ */
+function alignSequences(a: string[], b: string[]): Pairing[] {
+  const n = a.length;
+  const m = b.length;
+  const lcs = Array.from({ length: n + 1 }, () => Array.from({ length: m + 1 }, () => 0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const out: Pairing[] = [];
+  let gapA: number[] = [];
+  let gapB: number[] = [];
+  const flush = () => {
+    const paired = Math.min(gapA.length, gapB.length);
+    for (let k = 0; k < paired; k++) out.push({ a: gapA[k], b: gapB[k] });
+    for (const i of gapA.slice(paired)) out.push({ a: i });
+    for (const j of gapB.slice(paired)) out.push({ b: j });
+    gapA = [];
+    gapB = [];
+  };
+  let i = 0;
+  let j = 0;
+  while (i < n || j < m) {
+    if (i < n && j < m && a[i] === b[j]) {
+      flush();
+      out.push({ a: i++, b: j++ });
+    } else if (j < m && (i >= n || lcs[i][j + 1] >= lcs[i + 1][j])) {
+      gapB.push(j++);
+    } else {
+      gapA.push(i++);
+    }
+  }
+  flush();
+  return out;
+}
+
+const positional = (n: number, m: number): Pairing[] =>
+  Array.from({ length: Math.max(n, m) }, (_, k) => ({
+    a: k < n ? k : undefined,
+    b: k < m ? k : undefined,
+  }));
+
+const distinctLabels = (cells: string[]) =>
+  cells.every((cell) => cell.trim()) &&
+  new Set(cells.map((cell) => cell.trim())).size === cells.length;
+
+/**
+ * Columns match by position while the column count holds, so a renamed header
+ * stays one column. When it changes, they match by header, unless headers are
+ * blank or repeated.
+ */
+function alignColumns(before: TableModel, after: TableModel): TableColumnDiff[] {
+  const a = before.rows[0].cells;
+  const b = after.rows[0].cells;
+  const pairs =
+    a.length !== b.length && distinctLabels(a) && distinctLabels(b)
+      ? alignSequences(
+          a.map((cell) => cell.trim()),
+          b.map((cell) => cell.trim()),
+        )
+      : positional(a.length, b.length);
+  return pairs.map(({ a, b }) => ({ before: a, after: b }));
+}
+
+/**
+ * Rows of `after` against `before`: the header always pairs, and body rows
+ * match on the cells of the columns both versions share.
+ */
+export function diffTables(before: TableModel | null, after: TableModel): TableDiff {
+  if (!before) {
+    return {
+      columns: after.rows[0].cells.map((_, c) => ({ after: c })),
+      rows: after.rows.map((_, r) => ({ kind: "inserted", r })),
+    };
+  }
+  const columns = alignColumns(before, after);
+  const shared = columns.filter(
+    (col): col is Required<TableColumnDiff> => col.before !== undefined && col.after !== undefined,
+  );
+  const a = before.rows.map((row) => row.cells);
+  const b = after.rows.map((row) => row.cells);
+  const pair = (i: number, j: number): TableRowDiff => ({
+    kind: shared.every((col) => a[i][col.before] === b[j][col.after]) ? "same" : "changed",
+    r: j,
+    before: a[i],
+  });
+  const key = (cells: string[], side: "before" | "after") =>
+    shared.map((col) => cells[col[side]]).join("\u0000");
+  const body = alignSequences(
+    a.slice(1).map((cells) => key(cells, "before")),
+    b.slice(1).map((cells) => key(cells, "after")),
+  );
+  const rows = [
+    pair(0, 0),
+    ...body.map(({ a: i, b: j }): TableRowDiff => {
+      if (i === undefined) return { kind: "inserted", r: j! + 1 };
+      if (j === undefined) return { kind: "deleted", cells: a[i + 1] };
+      return pair(i + 1, j + 1);
+    }),
+  ];
+  return { columns, rows };
+}
+
 /** Pipes in typed text are escaped and newlines become `<br>`, so the row stays one line. */
 export function escapeCellText(text: string): string {
   let out = "";

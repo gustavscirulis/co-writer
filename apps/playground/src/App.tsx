@@ -22,8 +22,8 @@ import "@/components/version-history/version-history.css";
 // subset; its Tauri-backed actions (link opening, native clipboard menu,
 // image file URLs) fail when triggered, but editing and rendering work.
 const FULL = new URLSearchParams(location.search).has("full");
-// `?history` mounts the read-only version-history preview, diffing SAMPLE
-// against HISTORY_ORIGINAL.
+// `?history` mounts the read-only version-history preview, diffing
+// HISTORY_SAMPLE against HISTORY_ORIGINAL.
 const HISTORY = new URLSearchParams(location.search).has("history");
 
 // Image and wiki-embed widgets call Tauri's `convertFileSrc` while rendering;
@@ -83,6 +83,30 @@ const HISTORY_ORIGINAL = `# List playground
 A paragraph that was deleted in the next version.
 
 Plain paragraph after the list.
+
+| Day | Plan | Budget |
+| --- | --- | ---: |
+| Thu | Land early | €0 |
+| Fri | Tile museum | €45 |
+| Sat | Beach | €10 |
+
+| City | Nights | Hotel |
+| --- | --- | --- |
+| Lisbon | 3 | Alfama Rooms |
+| Porto | 2 | Ribeira Inn |
+`;
+
+const HISTORY_SAMPLE = `${SAMPLE}
+| Day | Plan | Who | Budget |
+| --- | --- | --- | ---: |
+| Thu | Land **early**, then Alfama | Both | €0 |
+| Sat | Beach | Sam | €10 |
+| Sun | Fly home | Both | €0 |
+
+| City | Nights |
+| --- | --- |
+| Lisbon | 4 |
+| Porto | 2 |
 `;
 
 // Renders the document with whitespace made visible and the caret marked,
@@ -118,7 +142,7 @@ function SourceView({ doc, head }: { doc: string; head: number }) {
 
 export function App() {
   const host = useRef<HTMLDivElement>(null);
-  const [doc, setDoc] = useState(SAMPLE);
+  const [doc, setDoc] = useState(HISTORY ? HISTORY_SAMPLE : SAMPLE);
   const [head, setHead] = useState(0);
 
   useEffect(() => {
@@ -126,7 +150,7 @@ export function App() {
     const view = new EditorView({
       parent: host.current,
       state: HISTORY
-        ? historyPreviewState(SAMPLE, HISTORY_ORIGINAL, () => "/playground/note.md")
+        ? historyPreviewState(HISTORY_SAMPLE, HISTORY_ORIGINAL, () => "/playground/note.md")
         : EditorState.create({
             doc: SAMPLE,
             extensions: [

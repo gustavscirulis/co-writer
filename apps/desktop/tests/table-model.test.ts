@@ -3,6 +3,7 @@ import {
   cellAtOffset,
   deleteColumn,
   deleteRow,
+  diffTables,
   escapeCellText,
   insertColumn,
   insertRow,
@@ -149,5 +150,62 @@ describe("cellAtOffset", () => {
 
   test("lands in empty cells", () => {
     expect(cellAtOffset(parsed.cells, 26).pos).toEqual({ r: 1, c: 0 });
+  });
+});
+
+describe("diffTables", () => {
+  const before = parse("| A | B |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |");
+
+  test("marks a changed cell, an inserted row and a deleted row in display order", () => {
+    const after = parse("| A | B |\n| - | - |\n| 1 | two |\n| 5 | 6 |\n| 7 | 8 |");
+    expect(diffTables(before, after)).toEqual({
+      columns: [
+        { before: 0, after: 0 },
+        { before: 1, after: 1 },
+      ],
+      rows: [
+        { kind: "same", r: 0, before: ["A", "B"] },
+        { kind: "changed", r: 1, before: ["1", "2"] },
+        { kind: "deleted", cells: ["3", "4"] },
+        { kind: "same", r: 2, before: ["5", "6"] },
+        { kind: "inserted", r: 3 },
+      ],
+    });
+  });
+
+  test("keeps a renamed header in its column while the column count holds", () => {
+    const after = parse("| A | C |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |");
+    const diff = diffTables(before, after);
+    expect(diff.columns).toEqual([
+      { before: 0, after: 0 },
+      { before: 1, after: 1 },
+    ]);
+    expect(diff.rows.map((row) => row.kind)).toEqual(["changed", "same", "same", "same"]);
+  });
+
+  test("matches columns by header when one is added or removed", () => {
+    const added = parse(
+      "| A | New | B |\n| - | - | - |\n| 1 | x | 2 |\n| 3 | y | 4 |\n| 5 | z | 6 |",
+    );
+    const diff = diffTables(before, added);
+    expect(diff.columns).toEqual([{ before: 0, after: 0 }, { after: 1 }, { before: 1, after: 2 }]);
+    expect(diff.rows.map((row) => row.kind)).toEqual(["same", "same", "same", "same"]);
+
+    const removed = parse("| B |\n| - |\n| 2 |\n| 4 |\n| 6 |");
+    expect(diffTables(before, removed).columns).toEqual([{ before: 0 }, { before: 1, after: 0 }]);
+  });
+
+  test("falls back to positions when headers repeat", () => {
+    const old = parse("| A | A |\n| - | - |\n| 1 | 2 |");
+    const next = parse("| A | X | A |\n| - | - | - |\n| 1 | x | 2 |");
+    expect(diffTables(old, next).columns).toEqual([
+      { before: 0, after: 0 },
+      { before: 1, after: 1 },
+      { before: undefined, after: 2 },
+    ]);
+  });
+
+  test("marks every row of a new table as inserted", () => {
+    expect(diffTables(null, before).rows.map((row) => row.kind)).toEqual(Array(4).fill("inserted"));
   });
 });

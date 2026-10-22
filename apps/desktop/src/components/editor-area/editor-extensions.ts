@@ -4,7 +4,7 @@ import { type Compartment, type Extension, Prec } from "@codemirror/state";
 import { html } from "@codemirror/lang-html";
 import { markdown } from "@codemirror/lang-markdown";
 import { history } from "@codemirror/commands";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { HighlightStyle, type LanguageSupport, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { tags } from "@lezer/highlight";
 import { GFM } from "@lezer/markdown";
@@ -102,7 +102,7 @@ function storeSyncExtension(getFilePath: () => string): Extension {
 // ends up with two.
 const htmlTagLanguage = html({ matchClosingTags: false, autoCloseTags: false });
 
-export function writerMarkdown(): Extension {
+export function writerMarkdown(): LanguageSupport {
   return markdown({
     codeLanguages: languages,
     extensions: [GFM, prosemarkMarkdownSyntaxExtensions, htmlBlockParserExtension],

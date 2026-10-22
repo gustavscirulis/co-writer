@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-22
+
+- Version history shows what changed in tables again. Added rows are highlighted, and removed rows appear struck through where they used to be. In an edited cell, only the words that changed are marked. Added columns are highlighted, and removed columns stay in place, struck through.
+
 ## 2026-10-17
 
 - On notes with lots of versions, the oldest and newest versions are now as easy to pick out as the ones in the middle. The magnified part of the timeline also holds still while you move across it, so you land on the version you're aiming at, and it slides along once you move past it. The other versions dim and brighten in step with the magnification instead of snapping ahead of it.

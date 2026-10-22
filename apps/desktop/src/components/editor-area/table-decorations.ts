@@ -4,12 +4,15 @@ import {
   Annotation,
   type EditorState,
   type Extension,
+  Facet,
   Prec,
   type Range,
   StateField,
+  type Text,
 } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, keymap, WidgetType } from "@codemirror/view";
-import type { SyntaxNode } from "@lezer/common";
+import { presentableDiff } from "@codemirror/merge";
+import type { SyntaxNode, Tree } from "@lezer/common";
 import {
   GFM,
   parser as markdownParser,
@@ -31,6 +34,7 @@ import {
   type CellPos,
   deleteColumn,
   deleteRow,
+  diffTables,
   escapeCellText,
   insertColumn,
   insertRow,
@@ -43,6 +47,7 @@ import {
   tableAligns,
   type TableCellRanges,
   type TableModel,
+  type TableDiff,
   tableWidth,
 } from "./table-model";
 
@@ -69,7 +74,7 @@ export type TableCellInlineNode =
   | { type: "break" }
   | {
       type: "element";
-      tag: "strong" | "em" | "code" | "s" | "span";
+      tag: "strong" | "em" | "code" | "s" | "span" | "ins" | "del";
       className?: string;
       href?: string;
       wikiTarget?: string;
@@ -321,6 +326,140 @@ function setCellMarkdownContent(cell: HTMLElement, markdown: string) {
   appendInlineMarkdownNodes(cell, parseTableCellInlineMarkdown(markdown));
 }
 
+// -- Diff --
+//
+// The history preview's diff can't reach inside the widget, so a table given a
+// baseline renders its own, with the merge view's classes.
+
+const plainText = (nodes: TableCellInlineNode[]): string =>
+  nodes
+    .map((node) =>
+      node.type === "text" ? node.text : node.type === "break" ? "\n" : plainText(node.children),
+    )
+    .join("");
+
+/**
+ * The cell as `after` renders, with the text that changed since `before`
+ * highlighted and removed text struck through in place. Compares rendered text,
+ * so markdown syntax is never split; a formatting-only edit highlights the cell.
+ */
+export function diffCellMarkdown(before: string, after: string): TableCellInlineNode[] {
+  const nodes = parseTableCellInlineMarkdown(after);
+  const textA = plainText(parseTableCellInlineMarkdown(before));
+  const textB = plainText(nodes);
+  if (textA === textB) return markdownElement("span", nodes, { className: "cm-changedText" });
+
+  const changes = presentableDiff(textA, textB);
+  const removedAt = (at: number, out: TableCellInlineNode[]) => {
+    for (const change of changes) {
+      if (change.fromB !== at || change.toA === change.fromA) continue;
+      const text = textA.slice(change.fromA, change.toA);
+      out.push(
+        ...markdownElement("del", [{ type: "text", text }], { className: "cm-deletedText" }),
+      );
+    }
+  };
+  let pos = 0;
+  const walk = (list: TableCellInlineNode[]): TableCellInlineNode[] => {
+    const out: TableCellInlineNode[] = [];
+    for (const node of list) {
+      if (node.type === "element") {
+        out.push({ ...node, children: walk(node.children) });
+        continue;
+      }
+      if (node.type === "break") {
+        removedAt(pos, out);
+        out.push(node);
+        pos++;
+        continue;
+      }
+      const start = pos;
+      const end = start + node.text.length;
+      while (pos < end) {
+        removedAt(pos, out);
+        const inserted = changes.find((change) => change.fromB <= pos && change.toB > pos);
+        const stop = inserted
+          ? Math.min(inserted.toB, end)
+          : Math.min(end, ...changes.filter((change) => change.fromB > pos).map((c) => c.fromB));
+        const piece: TableCellInlineNode = {
+          type: "text",
+          text: node.text.slice(pos - start, stop - start),
+        };
+        out.push(
+          ...(inserted
+            ? markdownElement("span", [piece], { className: "cm-changedText" })
+            : [piece]),
+        );
+        pos = stop;
+      }
+    }
+    return out;
+  };
+  const out = walk(nodes);
+  removedAt(pos, out);
+  return out;
+}
+
+function cellDiffNodes(before: string | undefined, after: string | undefined) {
+  if (after === undefined) {
+    return before
+      ? markdownElement("del", parseTableCellInlineMarkdown(before), {
+          className: "cm-deletedText",
+        })
+      : [];
+  }
+  if (before === undefined) {
+    return after
+      ? markdownElement("ins", parseTableCellInlineMarkdown(after), {
+          className: "cm-insertedLine",
+        })
+      : [];
+  }
+  return before === after ? parseTableCellInlineMarkdown(after) : diffCellMarkdown(before, after);
+}
+
+/** Paints `diff` into the table sections; returns the cells of the shown version's rows. */
+function paintTableDiff(
+  thead: HTMLElement,
+  tbody: HTMLElement,
+  model: TableModel,
+  { columns, rows }: TableDiff,
+): HTMLElement[][] {
+  const aligns = tableAligns(model);
+  const cells: HTMLElement[][] = [];
+  for (const row of rows) {
+    const shown = row.kind === "deleted" ? undefined : row.r;
+    const header = shown === 0;
+    const tr = (header ? thead : tbody).appendChild(document.createElement("tr"));
+    if (row.kind !== "same") tr.className = `cm-table-row-${row.kind}`;
+    const after = shown === undefined ? undefined : model.rows[shown].cells;
+    const before =
+      row.kind === "deleted" ? row.cells : row.kind === "inserted" ? undefined : row.before;
+    const rowCells: HTMLElement[] = [];
+    for (const col of columns) {
+      const cell = tr.appendChild(document.createElement(header ? "th" : "td"));
+      if (col.after !== undefined) {
+        const align = aligns[col.after];
+        if (align) cell.style.textAlign = align;
+        if (shown !== undefined) {
+          cell.dataset.row = String(shown);
+          cell.dataset.column = String(col.after);
+          rowCells[col.after] = cell;
+        }
+      }
+      appendInlineMarkdownNodes(
+        cell,
+        cellDiffNodes(
+          col.before === undefined ? undefined : before?.[col.before],
+          col.after === undefined ? undefined : after?.[col.after],
+        ),
+      );
+    }
+    if (shown !== undefined) cells[shown] = rowCells;
+  }
+  return cells;
+}
+
 // -- Editing --
 //
 // Every cell renders its markdown, and only the cell holding the caret shows
@@ -465,6 +604,15 @@ type CellFocus = CellPos & { caret: number | "end" };
 type ActiveCell = CellPos & { cell: HTMLElement };
 type ParsedTable = { model: TableModel; cells: TableCellRanges };
 
+/**
+ * The previous source of the table starting at `from`, for a view that shows a
+ * diff: `""` when the table is new, `null` when it didn't change.
+ */
+export const tableBaseline = Facet.define<
+  (state: EditorState, from: number) => string | null,
+  ((state: EditorState, from: number) => string | null) | undefined
+>({ combine: (values) => values[0] });
+
 const tableEditors = new WeakMap<HTMLElement, TableEditor>();
 const viewTableEditors = new WeakMap<EditorView, Set<TableEditor>>();
 
@@ -488,6 +636,8 @@ class TableEditor {
   editable = false;
   private model!: TableModel;
   private cellRanges: TableCellRanges = [];
+  private baseline: string | null = null;
+  private diff: TableDiff | null = null;
   private cells: HTMLElement[][] = [];
   private active: ActiveCell | null = null;
 
@@ -511,14 +661,20 @@ class TableEditor {
     this.dom.addEventListener("compositionend", this.onInput);
     this.dom.addEventListener("paste", this.onPaste);
     this.dom.addEventListener("focusout", this.onFocusOut);
-    this.paint(widget.raw, widget.table, widget.writable);
+    this.paint(widget);
     tableEditors.set(this.dom, this);
     editorsOf(view).add(this);
   }
 
   update(widget: TableWidget) {
-    if (widget.raw === this.raw && widget.writable === this.editable) return;
-    this.paint(widget.raw, widget.table, widget.writable);
+    if (
+      widget.raw === this.raw &&
+      widget.writable === this.editable &&
+      widget.baseline === this.baseline
+    ) {
+      return;
+    }
+    this.paint(widget);
   }
 
   destroy() {
@@ -563,11 +719,19 @@ class TableEditor {
     this.activate(r, c, { rendered: renderedCharsAt(cell, clampedX, y) });
   }
 
-  private paint(raw: string, table: ParsedTable, editable: boolean) {
+  private paint({
+    raw,
+    table,
+    writable: editable,
+    baseline,
+    diff,
+  }: Pick<TableWidget, "raw" | "table" | "writable" | "baseline" | "diff">) {
     const hadFocus = this.dom.contains(document.activeElement);
     this.raw = raw;
     this.model = table.model;
     this.cellRanges = table.cells;
+    this.baseline = baseline;
+    this.diff = diff;
     this.editable = editable;
     this.active = null;
     this.dom.classList.toggle("cm-table-editable", editable);
@@ -575,18 +739,22 @@ class TableEditor {
     const tableEl = document.createElement("table");
     const thead = tableEl.appendChild(document.createElement("thead"));
     const tbody = tableEl.appendChild(document.createElement("tbody"));
-    const aligns = tableAligns(table.model);
-    this.cells = table.model.rows.map((row, r) => {
-      const tr = (r === 0 ? thead : tbody).appendChild(document.createElement("tr"));
-      return row.cells.map((markdown, c) => {
-        const cell = tr.appendChild(document.createElement(r === 0 ? "th" : "td"));
-        cell.dataset.row = String(r);
-        cell.dataset.column = String(c);
-        if (aligns[c]) cell.style.textAlign = aligns[c];
-        setCellMarkdownContent(cell, markdown);
-        return cell;
+    if (diff) {
+      this.cells = paintTableDiff(thead, tbody, table.model, diff);
+    } else {
+      const aligns = tableAligns(table.model);
+      this.cells = table.model.rows.map((row, r) => {
+        const tr = (r === 0 ? thead : tbody).appendChild(document.createElement("tr"));
+        return row.cells.map((markdown, c) => {
+          const cell = tr.appendChild(document.createElement(r === 0 ? "th" : "td"));
+          cell.dataset.row = String(r);
+          cell.dataset.column = String(c);
+          if (aligns[c]) cell.style.textAlign = aligns[c];
+          setCellMarkdownContent(cell, markdown);
+          return cell;
+        });
       });
-    });
+    }
     this.inner.replaceChildren(tableEl);
 
     // Repainted under the caret (undo, a reload from disk): keep editing where
@@ -684,7 +852,10 @@ class TableEditor {
 
   private reset(raw: string) {
     const table = parseMarkdownTable(raw);
-    if (table) this.paint(raw, table, this.editable);
+    if (table) {
+      const { editable: writable, baseline, diff } = this;
+      this.paint({ raw, table, writable, baseline, diff });
+    }
   }
 
   private commitStructure(next: TableModel, focus: CellFocus) {
@@ -924,12 +1095,16 @@ class TableWidget extends WidgetType {
     readonly raw: string,
     readonly table: ParsedTable,
     readonly writable: boolean,
+    readonly baseline: string | null,
+    readonly diff: TableDiff | null,
   ) {
     super();
   }
 
   eq(other: TableWidget): boolean {
-    return other.raw === this.raw && other.writable === this.writable;
+    return (
+      other.raw === this.raw && other.writable === this.writable && other.baseline === this.baseline
+    );
   }
 
   get estimatedHeight(): number {
@@ -972,29 +1147,44 @@ const tableContainers = new Set([
 
 const isEditable = (state: EditorState) => !state.readOnly && state.facet(EditorView.editable);
 
-function buildTableDecorations(state: EditorState): DecorationSet {
-  const editable = isEditable(state);
-  const ranges: Range<Decoration>[] = [];
-  syntaxTree(state).iterate({
+/** The source range of every table the widget renders, in document order. */
+export function tableRanges(doc: Text, tree: Tree): { from: number; to: number }[] {
+  const ranges: { from: number; to: number }[] = [];
+  tree.iterate({
     enter(node) {
       if (node.name !== "Table") return tableContainers.has(node.name);
-      const line = state.doc.lineAt(node.from);
+      const line = doc.lineAt(node.from);
       // The widget starts at the line start so a row's indentation or `>` is
       // part of the source it rewrites.
-      if (!tablePrefix.test(state.doc.sliceString(line.from, node.from))) return false;
-      const raw = state.doc.sliceString(line.from, node.to);
-      const table = parseMarkdownTable(raw);
-      if (table) {
-        ranges.push(
-          Decoration.replace({
-            widget: new TableWidget(raw, table, editable),
-            block: true,
-          }).range(line.from, node.to),
-        );
+      if (tablePrefix.test(doc.sliceString(line.from, node.from))) {
+        ranges.push({ from: line.from, to: node.to });
       }
       return false;
     },
   });
+  return ranges;
+}
+
+function buildTableDecorations(state: EditorState): DecorationSet {
+  const editable = isEditable(state);
+  const baselineOf = state.facet(tableBaseline);
+  const ranges: Range<Decoration>[] = [];
+  for (const { from, to } of tableRanges(state.doc, syntaxTree(state))) {
+    const raw = state.doc.sliceString(from, to);
+    const parsed = parseMarkdownTable(raw);
+    if (!parsed) continue;
+    const baseline = baselineOf?.(state, from) ?? null;
+    const diff =
+      baseline === null
+        ? null
+        : diffTables(parseMarkdownTable(baseline)?.model ?? null, parsed.model);
+    ranges.push(
+      Decoration.replace({
+        widget: new TableWidget(raw, parsed, editable, baseline, diff),
+        block: true,
+      }).range(from, to),
+    );
+  }
   return Decoration.set(ranges);
 }
 
