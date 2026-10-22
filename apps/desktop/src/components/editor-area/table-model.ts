@@ -201,6 +201,66 @@ export function setAlign(m: TableModel, c: number, align: TableAlign): TableMode
   return { ...m, delimiter: withCells(m.delimiter, cells) };
 }
 
+/** How one displayed row differs from the table's previous version, in display order. */
+export type TableRowDiff =
+  | { kind: "same" | "inserted"; r: number }
+  | { kind: "changed"; r: number; before: string[] }
+  | { kind: "deleted"; cells: string[] };
+
+/**
+ * Rows of `after` against `before`: the header always pairs, body rows match on
+ * their cells, and unmatched rows between matches pair up as changed.
+ */
+export function diffTables(before: TableModel | null, after: TableModel): TableRowDiff[] {
+  if (!before) return after.rows.map((_, r) => ({ kind: "inserted", r }));
+  const a = before.rows.map((row) => row.cells);
+  const b = after.rows.map((row) => row.cells);
+  const out: TableRowDiff[] = [];
+  const pair = (i: number, j: number) =>
+    out.push(
+      sameCells(a[i], b[j]) ? { kind: "same", r: j } : { kind: "changed", r: j, before: a[i] },
+    );
+  pair(0, 0);
+
+  const n = a.length;
+  const m = b.length;
+  const lcs = Array.from({ length: n + 1 }, () => Array.from({ length: m + 1 }, () => 0));
+  for (let i = n - 1; i >= 1; i--) {
+    for (let j = m - 1; j >= 1; j--) {
+      lcs[i][j] = sameCells(a[i], b[j])
+        ? lcs[i + 1][j + 1] + 1
+        : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+
+  let i = 1;
+  let j = 1;
+  let gapA: number[] = [];
+  let gapB: number[] = [];
+  const flush = () => {
+    const paired = Math.min(gapA.length, gapB.length);
+    for (let k = 0; k < paired; k++) pair(gapA[k], gapB[k]);
+    for (const di of gapA.slice(paired)) out.push({ kind: "deleted", cells: a[di] });
+    for (const r of gapB.slice(paired)) out.push({ kind: "inserted", r });
+    gapA = [];
+    gapB = [];
+  };
+  while (i < n || j < m) {
+    if (i < n && j < m && sameCells(a[i], b[j])) {
+      flush();
+      out.push({ kind: "same", r: j });
+      i++;
+      j++;
+    } else if (j < m && (i >= n || lcs[i][j + 1] >= lcs[i + 1][j])) {
+      gapB.push(j++);
+    } else {
+      gapA.push(i++);
+    }
+  }
+  flush();
+  return out;
+}
+
 /** Pipes in typed text are escaped and newlines become `<br>`, so the row stays one line. */
 export function escapeCellText(text: string): string {
   let out = "";

@@ -3,6 +3,7 @@ import {
   cellAtOffset,
   deleteColumn,
   deleteRow,
+  diffTables,
   escapeCellText,
   insertColumn,
   insertRow,
@@ -149,5 +150,29 @@ describe("cellAtOffset", () => {
 
   test("lands in empty cells", () => {
     expect(cellAtOffset(parsed.cells, 26).pos).toEqual({ r: 1, c: 0 });
+  });
+});
+
+describe("diffTables", () => {
+  const before = parse("| A | B |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |");
+
+  test("marks a changed cell, an inserted row and a deleted row in display order", () => {
+    const after = parse("| A | B |\n| - | - |\n| 1 | two |\n| 5 | 6 |\n| 7 | 8 |");
+    expect(diffTables(before, after)).toEqual([
+      { kind: "same", r: 0 },
+      { kind: "changed", r: 1, before: ["1", "2"] },
+      { kind: "deleted", cells: ["3", "4"] },
+      { kind: "same", r: 2 },
+      { kind: "inserted", r: 3 },
+    ]);
+  });
+
+  test("always pairs the header", () => {
+    const after = parse("| A | C |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |");
+    expect(diffTables(before, after)[0]).toEqual({ kind: "changed", r: 0, before: ["A", "B"] });
+  });
+
+  test("marks every row of a new table as inserted", () => {
+    expect(diffTables(null, before).map((row) => row.kind)).toEqual(Array(4).fill("inserted"));
   });
 });

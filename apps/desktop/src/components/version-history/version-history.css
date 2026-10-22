@@ -28,11 +28,30 @@
 }
 .writer-history-preview .cm-deletedChunk .cm-deletedText,
 .writer-history-preview .cm-deletedChunk del,
+.writer-history-preview .cm-table-widget .cm-deletedText,
 .writer-history-preview .cm-deletedText {
   background: none;
   color: var(--writer-diff-deleted);
   text-decoration: line-through;
   text-decoration-color: color-mix(in srgb, var(--writer-diff-deleted) 70%, transparent);
+}
+
+/* Gradients layer over the header cells' own background. */
+.writer-history-preview .cm-table-row-inserted > *,
+.writer-history-preview .cm-table-row-changed > * {
+  background-image: linear-gradient(
+    var(--writer-diff-inserted-line),
+    var(--writer-diff-inserted-line)
+  );
+}
+.writer-history-preview .cm-table-row-deleted > * {
+  background-image: linear-gradient(
+    var(--writer-diff-deleted-line),
+    var(--writer-diff-deleted-line)
+  );
+}
+.writer-history-preview .cm-table-widget del + .cm-changedText {
+  margin-left: 0.3em;
 }
 
 /* Diff highlights settle in as each version swaps into the preview. */
@@ -43,7 +62,8 @@
 }
 :not([data-scrubbing]) > .writer-history-preview .cm-changedText,
 :not([data-scrubbing]) > .writer-history-preview ins.cm-insertedLine,
-:not([data-scrubbing]) > .writer-history-preview .cm-deletedChunk {
+:not([data-scrubbing]) > .writer-history-preview .cm-deletedChunk,
+:not([data-scrubbing]) > .writer-history-preview .cm-table-row-deleted {
   animation: writer-diff-in 240ms ease-out;
 }
 
@@ -311,7 +331,8 @@
   .history-dock *,
   .writer-history-preview .cm-changedText,
   .writer-history-preview ins.cm-insertedLine,
-  .writer-history-preview .cm-deletedChunk {
+  .writer-history-preview .cm-deletedChunk,
+  .writer-history-preview .cm-table-row-deleted {
     transition-property: opacity, --mark-fade, --mark-dim, --mark-lift !important;
     transition-delay: 0ms !important;
     animation: none !important;
