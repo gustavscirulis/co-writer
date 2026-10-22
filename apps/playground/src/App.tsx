@@ -89,14 +89,24 @@ Plain paragraph after the list.
 | Thu | Land early | €0 |
 | Fri | Tile museum | €45 |
 | Sat | Beach | €10 |
+
+| City | Nights | Hotel |
+| --- | --- | --- |
+| Lisbon | 3 | Alfama Rooms |
+| Porto | 2 | Ribeira Inn |
 `;
 
 const HISTORY_SAMPLE = `${SAMPLE}
-| Day | Plan | Budget |
-| --- | --- | ---: |
-| Thu | Land **early**, then Alfama | €0 |
-| Sat | Beach | €10 |
-| Sun | Fly home | €0 |
+| Day | Plan | Who | Budget |
+| --- | --- | --- | ---: |
+| Thu | Land **early**, then Alfama | Both | €0 |
+| Sat | Beach | Sam | €10 |
+| Sun | Fly home | Both | €0 |
+
+| City | Nights |
+| --- | --- |
+| Lisbon | 4 |
+| Porto | 2 |
 `;
 
 // Renders the document with whitespace made visible and the caret marked,

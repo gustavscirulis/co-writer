@@ -74,14 +74,30 @@ describe("history preview", () => {
       });
     }
     expect(diffs).toEqual([
-      [
-        { kind: "same", r: 0 },
-        { kind: "changed", r: 1, before: ["1", "2"] },
-        { kind: "deleted", cells: ["3", "4"] },
-        { kind: "same", r: 2 },
-      ],
+      {
+        columns: [
+          { before: 0, after: 0 },
+          { before: 1, after: 1 },
+        ],
+        rows: [
+          { kind: "same", r: 0, before: ["A", "B"] },
+          { kind: "changed", r: 1, before: ["1", "2"] },
+          { kind: "deleted", cells: ["3", "4"] },
+          { kind: "same", r: 2, before: ["5", "6"] },
+        ],
+      },
       null,
     ]);
+  });
+
+  test("leaves changed tables out of the prose diff, so the old table isn't repeated as raw markdown", () => {
+    const state = historyPreviewState(
+      "Intro.\n\n| A | New |\n| - | - |\n| 1 | x |\n",
+      "Intro.\n\n| A |\n| - |\n| 1 |\n",
+      () => "/n.md",
+    );
+    expect(getChunks(state)?.chunks).toHaveLength(0);
+    expect(firstChangePosition(state)).toBe(8);
   });
 
   test("shows every row of a table the version added as inserted", () => {
@@ -90,8 +106,10 @@ describe("history preview", () => {
     for (const source of state.facet(EditorView.decorations)) {
       if (typeof source === "function") continue;
       source.between(0, state.doc.length, (_from, _to, deco) => {
-        const widget = deco.spec.widget as { diff?: { kind: string }[] | null } | undefined;
-        widget?.diff?.forEach((row) => kinds.push(row.kind));
+        const widget = deco.spec.widget as
+          | { diff?: { rows: { kind: string }[] } | null }
+          | undefined;
+        widget?.diff?.rows.forEach((row) => kinds.push(row.kind));
       });
     }
     expect(kinds).toEqual(["inserted", "inserted"]);

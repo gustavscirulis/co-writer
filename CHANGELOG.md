@@ -2,7 +2,7 @@
 
 ## 2026-10-22
 
-- Version history shows what changed in tables again. Added rows are highlighted, removed rows appear struck through where they used to be, and an edited cell shows its old text struck through next to the new text.
+- Version history shows what changed in tables again. Added rows are highlighted, and removed rows appear struck through where they used to be. In an edited cell, only the words that changed are marked. Added columns are highlighted, and removed columns stay in place, struck through.
 
 ## 2026-10-17
 
