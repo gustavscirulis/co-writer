@@ -68,26 +68,86 @@ export function isCrowded(positions: number[], width: number): boolean {
   return false;
 }
 
-/** How far the pointer lens spreads the versions around it, as in the macOS Dock. */
-const LENS_STRENGTH = 5;
+/** How many versions either side of its focus the pointer lens spreads out. */
+const LENS_REACH = 6;
+/** Pixels between the versions under the lens. */
+const LENS_SPACING = 10;
+/** How far, in pixels, the pointer moves across the lens before the lens follows it. */
+const LENS_HOLD = 48;
+
+export interface LensShape {
+  /** How many times wider the gaps at the focus grow, before the track is rescaled. */
+  peak: number;
+  /** The hold distance, in percent. */
+  hold: number;
+}
+
+/** A lens that spreads the versions under it `LENS_SPACING` pixels apart on a track `width` pixels wide. */
+export function lensShape(positions: number[], width: number): LensShape {
+  const gaps = positions.length - 1;
+  const span = gaps > 0 ? ((positions[gaps] - positions[0]) / 100) * width : 0;
+  const reach = LENS_REACH * Math.sqrt(Math.PI);
+  const room = span - LENS_SPACING * reach;
+  // With no room left over, the lens takes nearly the whole track.
+  const peak = room > 0 ? (LENS_SPACING * (gaps - reach)) / room : gaps;
+  return { peak: Math.max(1, peak), hold: width > 0 ? (LENS_HOLD / width) * 100 : 0 };
+}
 
 /**
- * Positions bent by a fisheye lens at `focus` percent: close neighbours spread
- * apart, and the first and last versions stay put.
+ * Positions under a lens centred on version `focus` (fractional): gaps near
+ * it widen and every other gap gives up room in proportion, so the first and
+ * last versions stay put and neither end gets squeezed.
  */
-export function magnify(positions: number[], focus: number, strength = 1): number[] {
-  if (positions.length === 0) return positions;
-  const lens = LENS_STRENGTH * strength;
+export function magnify(positions: number[], focus: number, peak: number, strength = 1): number[] {
+  const lift = (peak - 1) * strength;
+  if (positions.length < 2 || lift <= 0) return positions;
+  const lengths = [0];
+  let total = 0;
+  for (let i = 1; i < positions.length; i++) {
+    const weight = 1 + lift * Math.exp(-(((i - 0.5 - focus) / LENS_REACH) ** 2));
+    total += (positions[i] - positions[i - 1]) * weight;
+    lengths.push(total);
+  }
+  if (total === 0) return positions;
   const first = positions[0];
-  const last = positions[positions.length - 1];
-  const centre = Math.max(first, Math.min(last, focus));
-  return positions.map((at) => {
-    const span = at >= centre ? last - centre : centre - first;
-    if (span === 0) return at;
-    const x = Math.abs(at - centre) / span;
-    const bent = ((lens + 1) * x) / (lens * x + 1);
-    return centre + Math.sign(at - centre) * bent * span;
-  });
+  const span = positions[positions.length - 1] - first;
+  return lengths.map((length) => first + (length / total) * span);
+}
+
+/** Where fractional version `index` sits among `positions`. */
+function spotOf(positions: number[], index: number): number {
+  const below = Math.max(0, Math.min(positions.length - 2, Math.floor(index)));
+  const t = index - below;
+  return positions[below] + t * ((positions[below + 1] ?? positions[below]) - positions[below]);
+}
+
+/** The lens focus that puts its own spot `offset` percent short of `pointer`. */
+export function focusAt(positions: number[], pointer: number, peak: number, offset = 0): number {
+  const target = pointer - offset;
+  let low = 0;
+  let high = Math.max(0, positions.length - 1);
+  for (let step = 0; step < 32; step++) {
+    const mid = (low + high) / 2;
+    if (spotOf(magnify(positions, mid, peak), mid) < target) low = mid;
+    else high = mid;
+  }
+  return (low + high) / 2;
+}
+
+/**
+ * The lens holds still while the pointer moves within `hold` percent of its
+ * focus, so the spread-out versions can be reached; past that it slides along.
+ */
+export function holdFocus(
+  positions: number[],
+  focus: number,
+  pointer: number,
+  { peak, hold }: LensShape,
+): number {
+  const at = spotOf(magnify(positions, focus, peak), focus);
+  if (pointer > at + hold) return focusAt(positions, pointer, peak, hold);
+  if (pointer < at - hold) return focusAt(positions, pointer, peak, -hold);
+  return focus;
 }
 
 /** Indexes of the day labels that fit `minGap` percent apart, keeping the newest day. */

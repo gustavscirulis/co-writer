@@ -168,7 +168,25 @@
   height: 1px;
   background: var(--line-subtle);
 }
+@property --mark-fade {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+@property --mark-dim {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0.5;
+}
+@property --mark-lift {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+/* Under the lens the rest step back by `--lens`, the lens's own eased strength,
+   so they dim and brighten with the swell instead of ahead of it. */
 .history-mark {
+  --mark-rest: calc(var(--mark-fade) * (1 - var(--lens, 0) * var(--mark-dim)));
   position: absolute;
   bottom: 0;
   left: 0;
@@ -177,24 +195,22 @@
   margin-left: -1px;
   border-radius: 1px;
   background: color-mix(in srgb, var(--fg-base) 40%, transparent);
+  opacity: calc(var(--mark-rest) + (1 - var(--mark-rest)) * var(--mark-lift));
   transform-origin: bottom;
-  transition: opacity 160ms ease-out;
+  transition:
+    --mark-fade 160ms ease-out,
+    --mark-dim 160ms ease-out,
+    --mark-lift 160ms ease-out;
 }
 .history-mark[data-agent] {
   background: var(--accent);
 }
 .history-mark[data-future] {
-  opacity: 0.3;
+  --mark-fade: 0.3;
+  --mark-dim: 0.27;
 }
-/* Under the lens the rest step back, so the version you're pointing at stands out. */
-.history-track[data-lens] .history-mark {
-  opacity: 0.5;
-}
-.history-track[data-lens] .history-mark[data-future] {
-  opacity: 0.22;
-}
-.history-track[data-lens] .history-mark[data-hover] {
-  opacity: 1;
+.history-mark[data-hover] {
+  --mark-lift: 1;
 }
 
 /* Full-width layers move by transform, so a percentage is a share of the track.
@@ -296,7 +312,7 @@
   .writer-history-preview .cm-changedText,
   .writer-history-preview ins.cm-insertedLine,
   .writer-history-preview .cm-deletedChunk {
-    transition-property: opacity !important;
+    transition-property: opacity, --mark-fade, --mark-dim, --mark-lift !important;
     transition-delay: 0ms !important;
     animation: none !important;
   }

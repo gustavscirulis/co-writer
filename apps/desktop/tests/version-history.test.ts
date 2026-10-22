@@ -6,7 +6,10 @@ import {
   historyPreviewState,
 } from "../src/components/version-history/history-preview-extensions";
 import {
+  focusAt,
+  holdFocus,
   isCrowded,
+  lensShape,
   magnify,
   nearestMark,
   timelineMarks,
@@ -108,22 +111,77 @@ describe("version timeline", () => {
     expect(nearestMark(at, at[1] + 1)).toBe(1);
   });
 
-  test("the lens spreads versions near the pointer and keeps their order", () => {
-    const at = Array.from({ length: 101 }, (_, i) => i);
-    const lensed = magnify(at, 40);
-    expect(lensed[40]).toBe(40);
-    expect(lensed[0]).toBe(0);
-    expect(lensed[100]).toBe(100);
-    expect(lensed[41] - lensed[40]).toBeGreaterThan(4);
-    expect(lensed[100] - lensed[99]).toBeLessThan(1);
+  const WIDTH = 600;
+  const track = (count: number) =>
+    Array.from({ length: count }, (_, i) => 2 + (i / (count - 1)) * 96);
+  const gapsPx = (at: number[]) => at.slice(1).map((x, i) => ((x - at[i]) / 100) * WIDTH);
+
+  test("the lens spreads versions near its focus, keeping the ends and their order", () => {
+    const at = track(300);
+    const { peak } = lensShape(at, WIDTH);
+    const lensed = magnify(at, 150, peak);
+    expect(lensed[0]).toBe(2);
+    expect(lensed[299]).toBeCloseTo(98);
     expect(lensed.every((x, i) => i === 0 || x > lensed[i - 1])).toBe(true);
-    expect(magnify(at, 40, 0)).toEqual(at);
-    const inset = Array.from({ length: 50 }, (_, i) => 2 + i * 2);
-    for (const pointer of [0, 1, 99, 100]) {
-      const edge = magnify(inset, pointer);
-      expect(edge[0]).toBe(2);
-      expect(edge[49]).toBe(100);
+    expect(gapsPx(lensed)[150]).toBeGreaterThan(9);
+    expect(gapsPx(lensed)[0]).toBeLessThan(gapsPx(at)[0]);
+    expect(magnify(at, 150, peak, 0)).toEqual(at);
+  });
+
+  test("the oldest and newest versions spread as far as the ones in the middle", () => {
+    const at = track(300);
+    const { peak } = lensShape(at, WIDTH);
+    const oldest = gapsPx(magnify(at, 0, peak));
+    const newest = gapsPx(magnify(at, 299, peak));
+    for (let i = 0; i < 3; i++) {
+      expect(oldest[i]).toBeGreaterThan(9);
+      expect(newest[298 - i]).toBeGreaterThan(9);
     }
+  });
+
+  test("a lens comes up centred under the pointer, even near the ends", () => {
+    const at = track(300);
+    const { peak } = lensShape(at, WIDTH);
+    const pointers = [0, 1, 2.3, 30, 70, 97.7, 99, 100];
+    const foci = pointers.map((pointer) => focusAt(at, pointer, peak));
+    pointers.forEach((pointer, i) => {
+      expect(nearestMark(magnify(at, foci[i], peak), pointer)).toBe(Math.round(foci[i]));
+    });
+    expect(foci.every((focus, i) => i === 0 || focus >= foci[i - 1])).toBe(true);
+    expect(focusAt(at, 0, peak)).toBeCloseTo(0);
+    expect(focusAt(at, 100, peak)).toBeCloseTo(299);
+  });
+
+  test("the lens holds still under the pointer, then slides along past its edge", () => {
+    const at = track(300);
+    const shape = lensShape(at, WIDTH);
+    const hovered = (focus: number, pointer: number) =>
+      nearestMark(magnify(at, focus, shape.peak), pointer);
+    const start = at[150];
+    const focus = focusAt(at, start, shape.peak);
+    expect(holdFocus(at, focus, start + shape.hold / 2, shape)).toBe(focus);
+    // Inside the lens, a 7px move steps one version rather than three or four.
+    expect(hovered(focus, start)).toBe(150);
+    expect(hovered(focus, start + (7 / WIDTH) * 100)).toBe(151);
+    const pushed = start + shape.hold * 2;
+    expect(holdFocus(at, focus, pushed, shape)).toBeCloseTo(
+      focusAt(at, pushed, shape.peak, shape.hold),
+    );
+    expect(holdFocus(at, focus, pushed, shape)).toBeGreaterThan(focus);
+    expect(holdFocus(at, 0, 0, shape)).toBe(0);
+    expect(holdFocus(at, 0, -50, shape)).toBeCloseTo(0);
+  });
+
+  test("the lens grows with the number of versions", () => {
+    expect(
+      lensShape(
+        timelineMarks(versions, NOW).map((mark) => mark.at),
+        700,
+      ).peak,
+    ).toBe(1);
+    const at = track(1000);
+    const lensed = gapsPx(magnify(at, 500, lensShape(at, WIDTH).peak));
+    expect(lensed[500]).toBeGreaterThan(9);
   });
 
   test("the lens is only needed once versions sit too close to point at", () => {
