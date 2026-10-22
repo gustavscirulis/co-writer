@@ -155,6 +155,60 @@ export function buildEditorBodyMenuItemsSpec(
   return items;
 }
 
+// -- Table cell menu --
+
+export type TableCellMenuActionId =
+  | "row-above"
+  | "row-below"
+  | "row-up"
+  | "row-down"
+  | "row-delete"
+  | "column-left"
+  | "column-right"
+  | "align-left"
+  | "align-center"
+  | "align-right"
+  | "column-move-left"
+  | "column-move-right"
+  | "column-delete";
+
+/** `row` 0 is the header, which can't be moved, deleted, or have a row inserted above it. */
+export function buildTableCellMenuItemsSpec(
+  at: { row: number; rows: number; column: number; columns: number },
+  run: (id: TableCellMenuActionId) => void,
+): MenuItemSpec[] {
+  const item = (id: TableCellMenuActionId, text: string): MenuItemSpec => ({
+    kind: "item",
+    id,
+    text,
+    action: () => run(id),
+  });
+  const body = at.row > 0;
+  const spec: Array<MenuItemSpec | false> = [
+    body && item("row-above", "Insert row above"),
+    item("row-below", "Insert row below"),
+    body && at.row > 1 && item("row-up", "Move row up"),
+    body && at.row < at.rows - 1 && item("row-down", "Move row down"),
+    body && item("row-delete", "Delete row"),
+    { kind: "separator" },
+    item("column-left", "Insert column left"),
+    item("column-right", "Insert column right"),
+    {
+      kind: "submenu",
+      text: "Align column",
+      items: [
+        item("align-left", "Left"),
+        item("align-center", "Center"),
+        item("align-right", "Right"),
+      ],
+    },
+    at.column > 0 && item("column-move-left", "Move column left"),
+    at.column < at.columns - 1 && item("column-move-right", "Move column right"),
+    at.columns > 1 && item("column-delete", "Delete column"),
+  ];
+  return spec.filter((entry): entry is MenuItemSpec => entry !== false);
+}
+
 // -- Tab menu --
 
 export type TabMenuActionId =
