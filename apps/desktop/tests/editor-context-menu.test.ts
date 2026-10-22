@@ -9,8 +9,10 @@ vi.mock("@tauri-apps/api/menu/submenu", () => ({ Submenu: { new: vi.fn() } }));
 
 import {
   buildEditorBodyMenuItemsSpec,
+  buildTableCellMenuItemsSpec,
   buildTabMenuItemsSpec,
   buildTitleMenuItemsSpec,
+  type MenuItemSpec,
   type EditorBodyMenuHandlers,
   type TabMenuHandlers,
   type TitleMenuHandlers,
@@ -255,5 +257,72 @@ describe("buildTitleMenuItemsSpec", () => {
       if (entry.kind === "item") entry.action();
     }
     expect(handlers.calls).toEqual(["rename", "reveal", "copy-path"]);
+  });
+});
+
+describe("buildTableCellMenuItemsSpec", () => {
+  const ids = (spec: MenuItemSpec[]): string[] =>
+    spec.flatMap((entry) =>
+      entry.kind === "item" ? [entry.id] : entry.kind === "submenu" ? ids(entry.items) : ["---"],
+    );
+
+  test("a header cell can't be moved, deleted, or have a row inserted above it", () => {
+    const spec = buildTableCellMenuItemsSpec({ row: 0, rows: 3, column: 0, columns: 2 }, () => {});
+    expect(ids(spec)).toEqual([
+      "row-below",
+      "---",
+      "column-left",
+      "column-right",
+      "align-left",
+      "align-center",
+      "align-right",
+      "column-move-right",
+      "column-delete",
+    ]);
+  });
+
+  test("a middle body cell offers every row and column action", () => {
+    const spec = buildTableCellMenuItemsSpec({ row: 2, rows: 4, column: 1, columns: 3 }, () => {});
+    expect(ids(spec)).toEqual([
+      "row-above",
+      "row-below",
+      "row-up",
+      "row-down",
+      "row-delete",
+      "---",
+      "column-left",
+      "column-right",
+      "align-left",
+      "align-center",
+      "align-right",
+      "column-move-left",
+      "column-move-right",
+      "column-delete",
+    ]);
+  });
+
+  test("a single column can't be deleted and the first body row can't move up", () => {
+    const spec = ids(
+      buildTableCellMenuItemsSpec({ row: 1, rows: 2, column: 0, columns: 1 }, () => {}),
+    );
+    expect(spec).not.toContain("row-up");
+    expect(spec).not.toContain("row-down");
+    expect(spec).not.toContain("column-delete");
+    expect(spec).not.toContain("column-move-left");
+  });
+
+  test("each item runs its action id", () => {
+    const calls: string[] = [];
+    const spec = buildTableCellMenuItemsSpec({ row: 1, rows: 3, column: 0, columns: 2 }, (id) =>
+      calls.push(id),
+    );
+    const run = (entries: MenuItemSpec[]) => {
+      for (const entry of entries) {
+        if (entry.kind === "item") entry.action();
+        if (entry.kind === "submenu") run(entry.items);
+      }
+    };
+    run(spec);
+    expect(calls).toEqual(ids(spec).filter((id) => id !== "---"));
   });
 });

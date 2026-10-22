@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vite-plus/test";
-import { EditorSelection, EditorState } from "@codemirror/state";
+import { EditorSelection, EditorState, type Extension } from "@codemirror/state";
 import { markdown } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree } from "@codemirror/language";
+import { EditorView } from "@codemirror/view";
 import { GFM } from "@lezer/markdown";
-import { foldExtension } from "../src/lib/prosemark-core/main";
 import {
   parseTableCellInlineMarkdown,
   tableDecorations,
@@ -16,51 +16,47 @@ const doc = before + table + after;
 const tableFrom = before.length;
 const tableTo = tableFrom + table.length;
 
-type FoldDecoration = {
+type TableDecoration = {
   from: number;
   to: number;
-  className: string;
-  hasWidget: boolean;
-  estimatedHeight?: number;
+  editable: boolean;
+  estimatedHeight: number;
 };
 
-function makeState(anchor: number, head = anchor, content = doc): EditorState {
-  let state = EditorState.create({
+function makeState(anchor: number, content = doc, extensions: Extension[] = []): EditorState {
+  const state = EditorState.create({
     doc: content,
-    extensions: [markdown({ extensions: [GFM] }), tableDecorations()],
-    selection: EditorSelection.single(anchor, head),
+    extensions: [markdown({ extensions: [GFM] }), tableDecorations(), ...extensions],
+    selection: EditorSelection.single(anchor),
   });
   ensureSyntaxTree(state, content.length, 1000);
-  state = state.update({ selection: state.selection }).state;
-  return state;
+  return state.update({ selection: state.selection }).state;
 }
 
-function collectFoldDecorations(state: EditorState): FoldDecoration[] {
-  const decorations: FoldDecoration[] = [];
-  state.field(foldExtension).between(0, state.doc.length, (from, to, decoration) => {
-    const spec = decoration.spec as { class?: string; widget?: unknown };
-    const widget = spec.widget as { estimatedHeight?: unknown } | undefined;
-    const estimatedHeight =
-      typeof widget?.estimatedHeight === "number" ? widget.estimatedHeight : undefined;
-    decorations.push({
-      from,
-      to,
-      className: spec.class ?? "",
-      hasWidget: spec.widget !== undefined,
-      estimatedHeight,
+function collectTables(state: EditorState): TableDecoration[] {
+  const tables: TableDecoration[] = [];
+  for (const source of state.facet(EditorView.decorations)) {
+    if (typeof source === "function") continue;
+    source.between(0, state.doc.length, (from, to, decoration) => {
+      const widget = decoration.spec.widget as
+        | { writable?: unknown; estimatedHeight?: unknown }
+        | undefined;
+      if (typeof widget?.writable !== "boolean") return;
+      tables.push({
+        from,
+        to,
+        editable: widget.writable,
+        estimatedHeight: widget.estimatedHeight as number,
+      });
     });
-  });
-  return decorations;
+  }
+  return tables;
 }
 
-function foldedTableEstimate(markdownTable: string): number {
-  const content = `${before}${markdownTable}${after}`;
-  const decorations = collectFoldDecorations(makeState(0, 0, content));
-  const widget = decorations.find((decoration) => decoration.hasWidget);
-  if (!widget?.estimatedHeight) {
-    throw new Error("Expected folded table widget with an estimated height");
-  }
-  return widget.estimatedHeight;
+function tableEstimate(markdownTable: string): number {
+  const [table] = collectTables(makeState(0, `${before}${markdownTable}${after}`));
+  if (!table) throw new Error("Expected a table widget");
+  return table.estimatedHeight;
 }
 
 describe("tableDecorations", () => {
@@ -131,61 +127,40 @@ describe("tableDecorations", () => {
     ]);
   });
 
-  test("folds a table to the rendered preview when selection is outside", () => {
-    const decorations = collectFoldDecorations(makeState(0));
-
-    expect(decorations).toContainEqual(
-      expect.objectContaining({
-        from: tableFrom,
-        to: tableTo,
-        hasWidget: true,
-        estimatedHeight: expect.any(Number),
-      }),
-    );
-    expect(decorations.some((d) => d.className.includes("cm-table-source-line"))).toBe(false);
+  test("renders the table as an editable widget wherever the caret is", () => {
+    for (const anchor of [0, tableFrom + 2, tableTo]) {
+      expect(collectTables(makeState(anchor))).toEqual([
+        expect.objectContaining({ from: tableFrom, to: tableTo, editable: true }),
+      ]);
+    }
   });
 
-  test("estimates folded table widget height for the virtualized heightmap", () => {
-    const estimate = foldedTableEstimate(table);
-
-    expect(estimate).toBeGreaterThan(70);
+  test("covers a list-indented table from its line start", () => {
+    const indented = "- item\n\n  | a | b |\n  | - | - |\n  | 1 | 2 |\n";
+    const [table] = collectTables(makeState(0, indented));
+    expect(indented.slice(table.from, table.to)).toBe("  | a | b |\n  | - | - |\n  | 1 | 2 |");
   });
 
-  test("increases the folded table height estimate with body rows", () => {
-    const shortTable = ["| Name | Count |", "| --- | ---: |", "| Tea | 2 |"].join("\n");
+  test("is read-only when the editor is", () => {
+    expect(collectTables(makeState(0, doc, [EditorState.readOnly.of(true)]))).toEqual([
+      expect.objectContaining({ editable: false }),
+    ]);
+    expect(collectTables(makeState(0, doc, [EditorView.editable.of(false)]))).toEqual([
+      expect.objectContaining({ editable: false }),
+    ]);
+  });
+
+  test("estimates the widget height for the virtualized heightmap", () => {
+    expect(tableEstimate(table)).toBeGreaterThan(70);
+  });
+
+  test("grows the height estimate with body rows", () => {
     const longTable = [
       "| Name | Count |",
       "| --- | ---: |",
       ...Array.from({ length: 12 }, (_, index) => `| Row ${index + 1} | ${index + 1} |`),
     ].join("\n");
 
-    expect(foldedTableEstimate(longTable)).toBeGreaterThan(foldedTableEstimate(shortTable));
-  });
-
-  test("unfolds a touched table as codeblock-styled source lines", () => {
-    const decorations = collectFoldDecorations(makeState(tableFrom + 2));
-    const sourceLines = decorations.filter((d) => d.className.includes("cm-table-source-line"));
-
-    expect(sourceLines).toHaveLength(3);
-    expect(sourceLines[0]).toEqual(
-      expect.objectContaining({
-        from: tableFrom,
-        to: tableFrom,
-        className: expect.stringContaining("cm-table-source-line-first"),
-        hasWidget: false,
-      }),
-    );
-    expect(sourceLines[2]?.className).toContain("cm-table-source-line-last");
-    expect(decorations.some((d) => d.from === tableFrom && d.to === tableTo && d.hasWidget)).toBe(
-      false,
-    );
-  });
-
-  test("range-selecting the whole table keeps source decorations instead of dropping the fold", () => {
-    const decorations = collectFoldDecorations(makeState(tableTo, tableFrom));
-
-    expect(decorations.length).toBeGreaterThan(0);
-    expect(decorations.every((d) => !d.hasWidget)).toBe(true);
-    expect(decorations.filter((d) => d.className.includes("cm-table-source-line"))).toHaveLength(3);
+    expect(tableEstimate(longTable)).toBeGreaterThan(tableEstimate(table));
   });
 });

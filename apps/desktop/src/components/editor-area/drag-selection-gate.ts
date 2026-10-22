@@ -97,7 +97,8 @@ const DRAG_END_USER_EVENT = "select.pointer.drag-end";
  * handlers call `preventDefault()` without `stopPropagation()`, so they bubble
  * to `contentDOM`. Without the skip, every pan or button press would arm the
  * gate and the matching `pointerup` would dispatch a spurious drag-end
- * selection transaction into the outer editor.
+ * selection transaction into the outer editor. Table cells place their own
+ * caret on `mousedown` for the same reason.
  */
 function shouldStartDragGate(
   state: EditorState,
@@ -111,7 +112,7 @@ function shouldStartDragGate(
   if (
     target &&
     typeof target.closest === "function" &&
-    target.closest(".cm-mermaid-widget, .cm-embed-widget, .cm-image-expand")
+    target.closest(".cm-mermaid-widget, .cm-embed-widget, .cm-table-widget, .cm-image-expand")
   ) {
     return null;
   }
