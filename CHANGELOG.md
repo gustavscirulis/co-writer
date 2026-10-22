@@ -2,7 +2,7 @@
 
 ## 2026-10-17
 
-- On notes with lots of versions, the oldest and newest versions are now as easy to pick out as the ones in the middle. The magnified part of the timeline also holds still while you move across it, so you land on the version you're aiming at, and it slides along once you move past it.
+- On notes with lots of versions, the oldest and newest versions are now as easy to pick out as the ones in the middle. The magnified part of the timeline also holds still while you move across it, so you land on the version you're aiming at, and it slides along once you move past it. The other versions dim and brighten in step with the magnification instead of snapping ahead of it.
 
 - History and Co-writer now have their own buttons at the top right of the window: a clock and a chat bubble. Each icon fills in while its panel is open. The buttons stay in the same place when Co-writer is open, so the button you used to open something is the one that closes it. Co-writer slides in underneath them. The New conversation button only shows once a conversation has started.
 

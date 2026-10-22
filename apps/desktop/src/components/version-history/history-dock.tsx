@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type KeyboardEvent, type PointerEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 import {
   closeVersionHistory,
   moveVersionSelection,
@@ -199,8 +206,8 @@ export function HistoryDock({ open, onExited }: HistoryDockProps) {
           aria-valuenow={position + 1}
           aria-valuetext={selected && (atNewest ? "Current version" : whenLabel(selected))}
           data-dragging={dragging || undefined}
-          data-lens={hover.active || undefined}
           className="history-track"
+          style={{ "--lens": strength } as CSSProperties}
           onPointerDown={(event) => {
             if (event.button !== 0 || marks.length === 0) return;
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -224,7 +231,8 @@ export function HistoryDock({ open, onExited }: HistoryDockProps) {
                 className="history-mark"
                 data-agent={mark.version.source === "agent" || undefined}
                 data-future={index > position || undefined}
-                data-hover={(hover.active && index === hover.index) || undefined}
+                // Stays lit while the lens settles, so it doesn't dip as the rest brighten.
+                data-hover={((hover.active || strength > 0) && index === hover.index) || undefined}
                 style={{
                   transform: markTransform(
                     (positions[index] / 100) * track.width,
