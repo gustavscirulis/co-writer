@@ -11,25 +11,32 @@
   --writer-diff-deleted-line: color-mix(in srgb, #ff7a70 6%, transparent);
 }
 
-.writer-history-preview .cm-changedLine,
-.writer-history-preview .cm-inlineChangedLine {
+.cm-editor.writer-history-preview.cm-merge-b .cm-changedLine {
   background-color: var(--writer-diff-inserted-line);
 }
-.writer-history-preview .cm-changedText,
-.writer-history-preview ins.cm-insertedLine {
+/* Inline edits mark the words that changed. The line is the same paragraph,
+   so it does not also take the wash used for a newly added block. */
+.cm-editor.writer-history-preview.cm-merge-b .cm-inlineChangedLine {
+  background-color: transparent;
+}
+/* CodeMirror's merge theme targets these with a 3-class selector (an underline
+   on inserts, a red fill on deletes). Match that element and outrank it, or
+   those rules paint over the highlights below. */
+.cm-editor.writer-history-preview.cm-merge-b .cm-changedText,
+.cm-editor.writer-history-preview.cm-merge-b ins.cm-insertedLine {
   background: var(--writer-diff-inserted);
   border-radius: 2px;
   text-decoration: none;
 }
 
-.writer-history-preview .cm-deletedChunk {
+.cm-editor.writer-history-preview .cm-deletedChunk {
   background-color: var(--writer-diff-deleted-line);
   padding-left: 0;
 }
-.writer-history-preview .cm-deletedChunk .cm-deletedText,
-.writer-history-preview .cm-deletedChunk del,
-.writer-history-preview .cm-table-widget .cm-deletedText,
-.writer-history-preview .cm-deletedText {
+.cm-editor.writer-history-preview.cm-merge-b .cm-deletedChunk .cm-deletedText,
+.cm-editor.writer-history-preview.cm-merge-b .cm-deletedChunk del,
+.cm-editor.writer-history-preview.cm-merge-b .cm-table-widget .cm-deletedText,
+.cm-editor.writer-history-preview.cm-merge-b .cm-deletedText {
   background: none;
   color: var(--writer-diff-deleted);
   text-decoration: line-through;
