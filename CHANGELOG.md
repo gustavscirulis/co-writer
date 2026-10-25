@@ -2,7 +2,7 @@
 
 ## 2026-10-25
 
-- In version history, added words are highlighted in green and removed words are struck through in red.
+- In version history, added words are highlighted in green and removed words are struck through in red. A line that still shows the old wording is not also marked as a new paragraph.
 
 ## 2026-10-22
 

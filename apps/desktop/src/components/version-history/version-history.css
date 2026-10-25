@@ -11,9 +11,13 @@
   --writer-diff-deleted-line: color-mix(in srgb, #ff7a70 6%, transparent);
 }
 
-.cm-editor.writer-history-preview.cm-merge-b .cm-changedLine,
-.cm-editor.writer-history-preview.cm-merge-b .cm-inlineChangedLine {
+.cm-editor.writer-history-preview.cm-merge-b .cm-changedLine {
   background-color: var(--writer-diff-inserted-line);
+}
+/* Inline edits mark the words that changed. The line is the same paragraph,
+   so it does not also take the wash used for a newly added block. */
+.cm-editor.writer-history-preview.cm-merge-b .cm-inlineChangedLine {
+  background-color: transparent;
 }
 /* CodeMirror's merge theme targets these with a 3-class selector (an underline
    on inserts, a red fill on deletes). Match that element and outrank it, or
