@@ -1,29 +1,5 @@
 # Co-writer
 
-A fast, lightweight app for your workspace's markdown files, with an AI writing partner built in.
-
-It is built with Tauri v2, React, Zustand, CodeMirror, and Rust. The app keeps documents on disk, respects workspace `.gitignore` rules, supports multiple windows, renders extended markdown such as tables and Mermaid diagrams, and ships with a signed macOS release flow.
-
-<p align="center">
-  <img alt="Co-writer open beside a note" src="docs/images/co-writer-panel.png" width="920">
-</p>
-
-Co-writer (⌘⇧L) sits beside the note. It can edit the text, and it can use your tools and MCP servers.
-
-<p align="center">
-  <img alt="Version history for a note" src="docs/images/version-history.png" width="920">
-</p>
-
-Version history (⌘⇧H) keeps earlier versions of a note. Select one to see the inline diff, and restore it to bring that version back.
-
-<p align="center">
-  <img alt="Comments queued for Co-writer" src="docs/images/queued-comments.png" width="920">
-</p>
-
-Queue comments on a note. They wait while a reply is in progress, then go out together.
-
-## About this fork
-
 Co-writer is a fork of [Writer](https://github.com/joelbqz/writer-computer). It adds an AI writing partner and ships as its own app, so it can sit next to Writer without replacing it. The main differences:
 
 - **Co-writer.** A panel (⌘⇧L) that runs your installed Claude Code or Codex CLI next to the note, with its own sign-in and permissions. Choose the agent in Settings → Co-writer → Agent. Ask it to edit the note, select text or ⌥-click a paragraph to point it at something, queue messages, attach files, mention other notes with @, and use your skills and MCP servers. Each note keeps its own conversation. The agent edits the open note directly, and asks before writing other notes or using tools, unless you've allowed that kind of request. Claude Code also asks before reading files outside the workspace. Codex can read them without asking.
@@ -34,6 +10,24 @@ Co-writer is a fork of [Writer](https://github.com/joelbqz/writer-computer). It 
 - **Separate releases.** Builds are published on [this repo's releases](https://github.com/gustavscirulis/co-writer/releases), and the in-app updater follows them instead of upstream's.
 
 Co-writer needs the [Claude Code CLI](https://code.claude.com) (2.1.296 or later) or the [Codex CLI](https://github.com/openai/codex) (0.162.1 or later) installed and signed in. Co-writer bundles neither and doesn't handle your accounts. See [`docs/third-party.md`](./docs/third-party.md) for license and attribution notes, and [`CHANGELOG.md`](./CHANGELOG.md) for everything that has changed since 2026-10-10, when this fork started.
+
+<p align="center">
+  <img alt="Co-writer open beside a note" src="docs/images/co-writer-panel.png" width="920">
+</p>
+
+<p>Co-writer sits beside the note. It can edit the text, and it can use your existing skills and MCP servers.</p>
+
+<p align="center">
+  <img alt="Version history for a note" src="docs/images/version-history.png" width="920">
+</p>
+
+<p>Version history keeps earlier versions of a note. Select one to see the inline diff, and restore it to bring that version back.</p>
+
+<p align="center">
+  <img alt="Comments queued for Co-writer" src="docs/images/queued-comments.png" width="920">
+</p>
+
+<p>Leave comments in-line and queue up multiple to address in one go.</p>
 
 ## Repository
 
