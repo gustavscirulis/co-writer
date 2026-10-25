@@ -8,13 +8,13 @@ It is built with Tauri v2, React, Zustand, CodeMirror, and Rust. The app keeps d
   <img alt="A note open in Co-writer, with the assistant panel beside the text" src="docs/images/co-writer-panel.png" width="920">
 </p>
 
-The note, with Co-writer open beside it.
+Co-writer beside the note, after looking the detail up in Glean.
 
 <p align="center">
   <img alt="Version history for a note, with an earlier draft diffed inline" src="docs/images/version-history.png" width="920">
 </p>
 
-Version history (⌘⇧H). One reply from the agent is one version, and the preview shows what changed.
+Version history (⌘⇧H) for a note with a long run of saved versions. The preview diffs the one you select.
 
 <p align="center">
   <img alt="Three comments queued for Co-writer while a reply is in progress" src="docs/images/queued-comments.png" width="920">
