@@ -5,10 +5,10 @@ A fast, lightweight app for your workspace's markdown files, with an AI writing 
 It is built with Tauri v2, React, Zustand, CodeMirror, and Rust. The app keeps documents on disk, respects workspace `.gitignore` rules, supports multiple windows, renders extended markdown such as tables and Mermaid diagrams, and ships with a signed macOS release flow.
 
 <p align="center">
-  <img alt="A note open in Co-writer, with the assistant panel beside the text" src="docs/images/co-writer-panel.png" width="920">
+  <img alt="Snapwell launch notes open in Co-writer, with the assistant panel beside the text" src="docs/images/co-writer-panel.png" width="920">
 </p>
 
-Co-writer beside the note, after looking the detail up in Glean.
+Co-writer beside a Snapwell launch note, after looking up App Store reviews in Glean.
 
 <p align="center">
   <img alt="Version history for a note, with an earlier draft diffed inline" src="docs/images/version-history.png" width="920">
