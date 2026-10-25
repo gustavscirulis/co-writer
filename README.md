@@ -4,6 +4,24 @@ A fast, lightweight app for your workspace's markdown files, with an AI writing 
 
 It is built with Tauri v2, React, Zustand, CodeMirror, and Rust. The app keeps documents on disk, respects workspace `.gitignore` rules, supports multiple windows, renders extended markdown such as tables and Mermaid diagrams, and ships with a signed macOS release flow.
 
+<p align="center">
+  <img alt="A note open in Co-writer, with the assistant panel beside the text" src="docs/images/co-writer-panel.png" width="920">
+</p>
+
+The note, with Co-writer open beside it.
+
+<p align="center">
+  <img alt="Version history for a note, with an earlier draft diffed inline" src="docs/images/version-history.png" width="920">
+</p>
+
+Version history (⌘⇧H). One reply from the agent is one version, and the preview shows what changed.
+
+<p align="center">
+  <img alt="Three comments queued for Co-writer while a reply is in progress" src="docs/images/queued-comments.png" width="920">
+</p>
+
+Comments queued for the next turn. They wait while a reply is in progress, then go out together.
+
 ## About this fork
 
 Co-writer is a fork of [Writer](https://github.com/joelbqz/writer-computer). It adds an AI writing partner and ships as its own app, so it can sit next to Writer without replacing it. The main differences:
