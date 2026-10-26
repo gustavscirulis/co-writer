@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-26
+
+- When a long conversation gets too big, Co-writer now tells you it's "Compacting conversation…" instead of looking stuck on "Thinking…". Afterwards, a "Conversation compacted" line marks where it happened: Co-writer only remembers a summary of the messages above it. This works with both Claude and Codex.
+
 ## 2026-10-25
 
 - In version history, added words are highlighted in green and removed words are struck through in red. A line that still shows the old wording is not also marked as a new paragraph.

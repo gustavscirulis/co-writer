@@ -133,6 +133,7 @@ export function createCodexParser(): (line: string) => ClaudeEvent[] {
         if (item.type === "agentMessage")
           return [{ type: "block_start", index: block(itemId), kind: "text", text: "" }];
         if (item.type === "reasoning") return [{ type: "thinking" }];
+        if (item.type === "contextCompaction") return [{ type: "compacting", active: true }];
         const tool = toolFor(item);
         return tool
           ? [{ type: "block_start", index: block(itemId), kind: "tool_use", text: "", tool }]
@@ -151,6 +152,8 @@ export function createCodexParser(): (line: string) => ClaudeEvent[] {
             { type: "delta", text, index },
           ];
         }
+        if (item.type === "contextCompaction")
+          return [{ type: "compacted" }, { type: "compacting", active: false }];
         if (!toolFor(item)) return [];
         const status = string(item.status);
         return [

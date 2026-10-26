@@ -51,6 +51,8 @@ export interface ChatMessage {
   /** Files in `files` the text mentions as `@label`, shown as pills there. */
   mentions?: Mention[];
   textBlocks?: { key: string; text: string; snapshotId?: string; snapshotIndex?: number }[];
+  /** The agent compacted the conversation after this message. */
+  compacted?: true;
 }
 export function isVisibleMessage(message: ChatMessage) {
   return message.text !== "" || message.tools.length > 0;
@@ -70,6 +72,8 @@ export type ClaudeEvent =
   | { type: "permission_cancel"; id: string }
   | { type: "unsupported_control"; id: string; subtype: string }
   | { type: "init"; sessionId: string }
+  | { type: "compacting"; active: boolean }
+  | { type: "compacted" }
   | { type: "start"; id: string }
   | { type: "block_start"; index: number; kind: string; text: string; tool?: ChatTool }
   | { type: "thinking" }
@@ -132,6 +136,9 @@ export function parseClaudeLine(line: string): ClaudeEvent | null {
   }
   if (data.type === "system" && data.subtype === "init" && typeof data.session_id === "string")
     return { type: "init", sessionId: data.session_id };
+  if (data.type === "system" && data.subtype === "status")
+    return { type: "compacting", active: data.status === "compacting" };
+  if (data.type === "system" && data.subtype === "compact_boundary") return { type: "compacted" };
   if (data.type === "stream_event") {
     const event = object(data.event);
     if (event.type === "message_start")
@@ -257,6 +264,13 @@ export function reduceClaudeMessages(
     if (!event.id) throw new Error("Claude emitted a message without an ID");
     return messages; // A protocol start is not yet visible assistant content.
   }
+  if (event.type === "compacted") {
+    const visible = messages.filter(isVisibleMessage);
+    const last = visible[visible.length - 1];
+    return !last || last.compacted
+      ? messages
+      : messages.map((m) => (m === last ? { ...m, compacted: true as const } : m));
+  }
   if (event.type !== "delta" && event.type !== "assistant" && event.type !== "block_start")
     return messages;
   if (event.type === "block_start" && event.kind !== "text" && !event.tool) return messages;
@@ -329,7 +343,7 @@ export function reduceClaudeMessages(
   return existing ? messages.map((m) => (m === existing ? next : m)) : [...messages, next];
 }
 
-export type ClaudeActivity = "thinking" | "responding" | "working" | null;
+export type ClaudeActivity = "thinking" | "responding" | "working" | "compacting" | null;
 
 /** Protocol phase, with tool execution scoped to the latest user turn. */
 export function getClaudeActivity(
@@ -338,6 +352,9 @@ export function getClaudeActivity(
   previous: ClaudeActivity,
 ): ClaudeActivity {
   switch (event.type) {
+    case "compacting":
+      if (event.active) return "compacting";
+      return previous === "compacting" ? "thinking" : previous;
     case "start":
     case "thinking":
       return "thinking";
