@@ -24,6 +24,12 @@ Codex app-server: `item/started` and `item/completed` with an item of `{ "type":
 
 `parseClaudeLine` and `createCodexParser` map both to `{ type: "compacting", active }` and `{ type: "compacted" }`. These go through the shared `reduceClaudeMessages` / `getClaudeActivity` path.
 
+## Manual compaction
+
+`/compact` is a Claude Code built-in. `parse_skills` drops other built-ins, because they manage a terminal session Co-writer doesn't have, but keeps this one so it appears in the slash menu. It runs on the resumed session. `promptContent` appends `<writer_context>` after it, and Claude Code accepts that as summary instructions. When there is nothing to summarise, Claude Code replies with a synthetic assistant message: "Not enough messages to compact."
+
+Codex has no slash command for this. Supporting it would mean sending `thread/compact/start` instead of `turn/start`.
+
 ## Known limitation
 
 Codex shows a whole turn as one message. If Codex compacts partway through a turn, the divider lands after the whole turn rather than at the exact point. Compaction at the start of a turn lands correctly, after the user's message.

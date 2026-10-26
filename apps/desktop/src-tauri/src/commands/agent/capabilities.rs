@@ -93,13 +93,14 @@ fn text(value: &Value) -> String {
 
 // Built-ins like /clear or /model manage a terminal session Writer doesn't have, and
 // MCP prompts carry spaces in their names, so only user-runnable commands are listed.
+// /compact works on the resumed session, so it is the one built-in kept.
 fn parse_skills(body: &Value) -> Result<Vec<Skill>, String> {
     let commands = body["commands"]
         .as_array()
         .ok_or("Claude Code sent an unreadable skill list")?;
     Ok(commands
         .iter()
-        .filter(|command| command["builtin"] != true)
+        .filter(|command| command["builtin"] != true || command["name"] == "compact")
         .filter_map(|command| {
             let name = command["name"].as_str()?;
             if name.is_empty() || name.contains(char::is_whitespace) {
@@ -437,6 +438,7 @@ mod tests {
             {"name": "ux-copy", "description": "Write UX copy (user)", "argumentHint": ""},
             {"name": "pdf", "description": "PDFs", "argumentHint": "<file>", "aliases": ["anthropic-skills:pdf"]},
             {"name": "clear", "description": "Start a new session", "argumentHint": "[name]", "builtin": true},
+            {"name": "compact", "description": "Summarize the conversation", "argumentHint": "<instructions>", "builtin": true},
             {"name": "claude.ai Figma:rules (MCP)", "description": "MCP prompt", "argumentHint": ""},
             {"description": "nameless"}
         ]}}});
@@ -455,6 +457,12 @@ mod tests {
                         description: "PDFs".into(),
                         argument_hint: "<file>".into(),
                         aliases: vec!["anthropic-skills:pdf".into()],
+                    },
+                    Skill {
+                        name: "compact".into(),
+                        description: "Summarize the conversation".into(),
+                        argument_hint: "<instructions>".into(),
+                        aliases: vec![],
                     },
                 ],
                 vec![]
@@ -538,6 +546,10 @@ mod tests {
             .iter()
             .all(|server| !server.name.is_empty()));
         assert!(!capabilities.skills.is_empty());
+        assert!(capabilities
+            .skills
+            .iter()
+            .any(|skill| skill.name == "compact"));
         assert!(capabilities
             .models
             .iter()
