@@ -2,6 +2,8 @@
 
 ## 2026-10-26
 
+- The word count at the bottom of the note hides while version history is open, so it no longer covers the timeline.
+
 - When a long conversation gets too big, Co-writer now tells you it's "Compacting conversation…" instead of looking stuck on "Thinking…". Afterwards, a "Conversation compacted" line marks where it happened: Co-writer only remembers a summary of the messages above it. This works with both Claude and Codex.
 
 - With Claude, type `/compact` in Co-writer to compact the conversation yourself. It now appears in the slash menu, and you can add instructions for what the summary should keep.

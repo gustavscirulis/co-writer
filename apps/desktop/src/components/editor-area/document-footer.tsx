@@ -1,6 +1,7 @@
 import type { MouseEvent } from "react";
 import { useFileStats } from "@/hooks/use-tabs";
 import { useBooleanSetting, useSetSetting } from "@/hooks/use-settings";
+import { useHistoryPath } from "@/hooks/use-version-history";
 import {
   FOOTER_METRICS,
   showFooterContextMenu,
@@ -18,6 +19,7 @@ function FooterMetric({ label, value }: { label: string; value: number }) {
 
 export function DocumentFooter({ filePath }: { filePath: string }) {
   const stats = useFileStats(filePath);
+  const showsHistory = useHistoryPath() === filePath;
   const setSetting = useSetSetting();
   const visibility: Record<FooterMetricSettingKey, boolean> = {
     "statusbar.show-words": useBooleanSetting("statusbar.show-words"),
@@ -26,7 +28,7 @@ export function DocumentFooter({ filePath }: { filePath: string }) {
   };
   const visibleMetrics = FOOTER_METRICS.filter((metric) => visibility[metric.settingKey]);
 
-  if (visibleMetrics.length === 0) return null;
+  if (showsHistory || visibleMetrics.length === 0) return null;
 
   const handleContextMenu = (event: MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
