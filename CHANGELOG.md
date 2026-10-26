@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-26
+
+- The word count at the bottom of the note hides while version history is open, so it no longer covers the timeline.
+
 ## 2026-10-25
 
 - In version history, added words are highlighted in green and removed words are struck through in red. A line that still shows the old wording is not also marked as a new paragraph.
