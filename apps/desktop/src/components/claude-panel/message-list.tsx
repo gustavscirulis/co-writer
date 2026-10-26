@@ -14,19 +14,26 @@ import { ChatActivity } from "./chat-activity";
 import { EmptyState } from "./empty-state";
 import "./chat-panel.css";
 
-type Turn = { role: ChatMessage["role"]; messages: ChatMessage[]; notices: string[] };
+type Turn = {
+  role: ChatMessage["role"];
+  messages: ChatMessage[];
+  notices: string[];
+  compacted: boolean;
+};
 
 function groupTurns(messages: ChatMessage[], notices: ChatNotice[]) {
   const turns: Turn[] = [];
   for (const message of messages) {
     if (!isVisibleMessage(message)) continue;
     let last = turns[turns.length - 1];
-    if (message.role === "assistant" && last?.role === "assistant") last.messages.push(message);
+    if (message.role === "assistant" && last?.role === "assistant" && !last.compacted)
+      last.messages.push(message);
     else {
-      last = { role: message.role, messages: [message], notices: [] };
+      last = { role: message.role, messages: [message], notices: [], compacted: false };
       turns.push(last);
     }
     for (const notice of notices) if (notice.afterId === message.id) last.notices.push(notice.text);
+    if (message.compacted) last.compacted = true;
   }
   return turns;
 }
@@ -80,6 +87,17 @@ export function MessageList() {
                     {turn.notices.join("\n")}
                   </p>
                 </Disclosure>
+              )}
+              {turn.compacted && (
+                <div
+                  role="separator"
+                  aria-label="Conversation compacted"
+                  className="flex items-center gap-3 text-[12px] text-[var(--text-muted)]"
+                >
+                  <span className="h-px flex-1 bg-[var(--line-subtler)]" />
+                  Conversation compacted
+                  <span className="h-px flex-1 bg-[var(--line-subtler)]" />
+                </div>
               )}
             </Fragment>
           ))}

@@ -193,6 +193,22 @@ describe("Codex stream", () => {
     });
   });
 
+  test("context compaction reports activity and marks the turn's reply", () => {
+    const compaction = (method: string) =>
+      line(method, { item: { type: "contextCompaction", id: "c" } });
+    const { messages, events } = replay([
+      line("turn/started", { turn: { id: "t" } }),
+      ...message("m", ["Done."]),
+      compaction("item/started"),
+      compaction("item/completed"),
+    ]);
+    expect(events.slice(-3)).toEqual([
+      { type: "compacting", active: true },
+      { type: "compacted" },
+      { type: "compacting", active: false },
+    ]);
+    expect(messages).toMatchObject([{ id: "t", text: "Done.", compacted: true }]);
+  });
   test("malformed lines throw so the store can stop the turn", () => {
     const parse = createCodexParser();
     expect(() => parse("not JSON")).toThrow();
