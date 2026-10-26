@@ -1,5 +1,7 @@
 # Co-writer
 
+[Download Co-writer for macOS from GitHub Releases](https://github.com/gustavscirulis/co-writer/releases).
+
 Co-writer is a fork of [Writer](https://github.com/joelbqz/writer-computer). It adds an AI writing partner and ships as its own app, so it can sit next to Writer without replacing it. The main differences:
 
 - **Co-writer.** A panel (⌘⇧L) that runs your installed Claude Code or Codex CLI next to the note, with its own sign-in and permissions. Choose the agent in Settings → Co-writer → Agent. Ask it to edit the note, select text or ⌥-click a paragraph to point it at something, queue messages, attach files, mention other notes with @, and use your skills and MCP servers. Each note keeps its own conversation. The agent edits the open note directly, and asks before writing other notes or using tools, unless you've allowed that kind of request. Claude Code also asks before reading files outside the workspace. Codex can read them without asking.
