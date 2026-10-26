@@ -12,21 +12,22 @@ export function ChatActivity({ path }: { path: string | null }) {
   const hasMessages = useHasChatMessages(path);
   const activity = useChatActivity(path);
   const permissions = useToolPermissions(path);
-  const shown =
-    status === "stopping" ||
-    (status === "running" && permissions.length === 0 && activity !== "working");
-  const thinking = status === "running" && permissions.length === 0 && activity === "thinking";
+  const waiting = status === "running" && permissions.length === 0;
+  const shown = status === "stopping" || (waiting && activity !== "working");
+  const shimmer = waiting && (activity === "thinking" || activity === "compacting");
   const label =
     status === "running"
       ? permissions.length > 0
         ? needsAnswer(permissions[0].tool)
           ? "Waiting for your answer."
           : "Waiting for your approval."
-        : thinking
-          ? "Thinking…"
-          : activity === "working"
-            ? "Using tools…"
-            : "Responding…"
+        : activity === "compacting"
+          ? "Compacting conversation…"
+          : activity === "thinking"
+            ? "Thinking…"
+            : activity === "working"
+              ? "Using tools…"
+              : "Responding…"
       : status === "stopping"
         ? "Finishing…"
         : status === "idle" && hasMessages
@@ -40,7 +41,7 @@ export function ChatActivity({ path }: { path: string | null }) {
       aria-atomic="true"
     >
       {shown && <AgentIndicator state="running" />}
-      <span className={thinking ? "chat-thinking-shimmer" : "text-[var(--text-muted)]"}>
+      <span className={shimmer ? "chat-thinking-shimmer" : "text-[var(--text-muted)]"}>
         {label}
       </span>
     </div>

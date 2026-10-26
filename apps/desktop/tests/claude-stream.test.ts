@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vite-plus/test";
-import { parseClaudeLine, reduceClaudeMessages, type ChatMessage } from "../src/lib/claude-stream";
+import {
+  getClaudeActivity,
+  parseClaudeLine,
+  reduceClaudeMessages,
+  type ChatMessage,
+  type ClaudeActivity,
+} from "../src/lib/claude-stream";
 const parse = (data: unknown) => parseClaudeLine(JSON.stringify(data))!;
 describe("Claude stream", () => {
   test("reconciles streaming/final text without duplicating tool-turn messages", () => {
@@ -207,4 +213,41 @@ test("snapshot-only blocks reconcile repeated UUIDs and independent message IDs"
   messages = reduceClaudeMessages(messages, snapshot("one", "a", "First."), null);
   messages = reduceClaudeMessages(messages, snapshot("two", "c", "Another reply."), null);
   expect(messages.map((message) => message.text)).toEqual(["First.\n\nSecond.", "Another reply."]);
+});
+
+test("compaction shows as activity and marks the last visible message", () => {
+  // Order as Claude Code 2.1.310 emits it for `/compact`.
+  const lines = [
+    { type: "system", subtype: "status", status: "compacting" },
+    { type: "system", subtype: "status", status: null, compact_result: "success" },
+    { type: "system", subtype: "init", session_id: "session" },
+    {
+      type: "system",
+      subtype: "compact_boundary",
+      compact_metadata: { trigger: "manual", pre_tokens: 67388 },
+    },
+    { type: "user", isSynthetic: true, message: { role: "user", content: "Summary…" } },
+  ];
+  let messages: ChatMessage[] = [
+    { id: "u1", role: "user", text: "Hi", tools: [] },
+    { id: "a1", role: "assistant", text: "Hello.", tools: [] },
+    { id: "u2", role: "user", text: "/compact", tools: [] },
+    { id: "empty", role: "assistant", text: "", tools: [] },
+  ];
+  let activity: ClaudeActivity = "thinking";
+  const seen: ClaudeActivity[] = [];
+  for (const data of lines) {
+    const event = parse(data);
+    if (!event) continue;
+    messages = reduceClaudeMessages(messages, event, null);
+    activity = getClaudeActivity(event, messages, activity);
+    seen.push(activity);
+  }
+  expect(seen).toEqual(["compacting", "thinking", "thinking", "thinking"]);
+  expect(messages.filter((m) => m.compacted).map((m) => m.id)).toEqual(["u2"]);
+  expect(getClaudeActivity(parse(lines[1]), messages, "responding")).toBe("responding");
+  expect(parse({ type: "system", subtype: "status", status: "requesting" })).toEqual({
+    type: "compacting",
+    active: false,
+  });
 });
