@@ -54,8 +54,8 @@ export function writeFile(path: string, content: string): Promise<WriteResult> {
   );
 }
 
-export function createFile(path: string): Promise<FileContent> {
-  return invoke<FileContent>("create_file", { path }).then((file) => {
+export function createFile(path: string, content?: string): Promise<FileContent> {
+  return invoke<FileContent>("create_file", { path, content }).then((file) => {
     if (file.canonical_path) registerDocumentPath(path, file.canonical_path);
     return file;
   });

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-27
+
+- A new note's name is now its heading. Name it in ⌘N, or rename a new note in the sidebar, and it opens with that title and the caret on the line below, ready to write.
+
 ## 2026-10-26
 
 - The README now links directly to GitHub Releases for downloading the macOS app.

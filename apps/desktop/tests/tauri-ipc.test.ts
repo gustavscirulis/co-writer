@@ -65,6 +65,7 @@ describe("filesystem IPC wrappers", () => {
     await ipc.createFile("/new.md");
     expect(mockedInvoke).toHaveBeenCalledWith("create_file", {
       path: "/new.md",
+      content: undefined,
     });
   });
 

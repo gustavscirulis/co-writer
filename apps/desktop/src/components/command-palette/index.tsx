@@ -37,6 +37,7 @@ import { useGlobalRecentFiles } from "@/hooks/use-global-recent-files";
 import { openStandaloneFile } from "@/hooks/use-open-drop";
 import { settingsKind } from "@/components/editor-area/page-kinds/settings";
 import { getFileName, getFileStem, getParentDir } from "@/lib/paths";
+import { titledNote } from "@/lib/new-note";
 import * as tauri from "@/lib/tauri";
 import type { RecentFile } from "@/lib/tauri";
 
@@ -105,7 +106,7 @@ export function CommandPalette() {
 
     close();
     void (async () => {
-      await tauri.createFile(createPath);
+      await tauri.createFile(createPath, titledNote(getFileStem(createPath)));
       if (isCompactFileMode) {
         await openStandaloneFile(createPath);
       } else {

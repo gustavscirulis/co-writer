@@ -491,12 +491,12 @@ pub async fn read_file_entries(
     blocking(move || Ok(read_file_entries_impl(paths, &root))).await
 }
 
-pub fn create_file_impl(path: &str) -> Result<FileContent, AppError> {
+pub fn create_file_impl(path: &str, content: Option<&str>) -> Result<FileContent, AppError> {
     let file_path = PathBuf::from(path);
     if let Some(parent) = file_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let default_content = "# ";
+    let content = content.unwrap_or("# ");
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -508,21 +508,21 @@ pub fn create_file_impl(path: &str) -> Result<FileContent, AppError> {
                 AppError::Io(error.to_string())
             }
         })?;
-    if let Err(error) = file.write_all(default_content.as_bytes()) {
+    if let Err(error) = file.write_all(content.as_bytes()) {
         let _ = fs::remove_file(&file_path);
         return Err(AppError::Io(error.to_string()));
     }
     Ok(FileContent {
         canonical_path: fs::canonicalize(&file_path)?.to_string_lossy().into_owned(),
         path: path.to_string(),
-        content: default_content.to_string(),
+        content: content.to_string(),
         modified_at: modified_time(&file_path),
     })
 }
 
 #[tauri::command]
-pub async fn create_file(path: String) -> Result<FileContent, AppError> {
-    blocking(move || create_file_impl(&path)).await
+pub async fn create_file(path: String, content: Option<String>) -> Result<FileContent, AppError> {
+    blocking(move || create_file_impl(&path, content.as_deref())).await
 }
 
 pub fn create_directory_impl(path: &str) -> Result<DirEntry, AppError> {
@@ -578,10 +578,12 @@ fn create_sidebar_candidate(
     kind: SidebarEntryKind,
 ) -> Result<DirEntry, AppError> {
     match kind {
-        SidebarEntryKind::File => create_file_impl(&candidate.to_string_lossy()).and_then(|_| {
-            markdown_file_entry(candidate)
-                .ok_or_else(|| AppError::Io("Created Markdown file is unreadable".into()))
-        }),
+        SidebarEntryKind::File => {
+            create_file_impl(&candidate.to_string_lossy(), None).and_then(|_| {
+                markdown_file_entry(candidate)
+                    .ok_or_else(|| AppError::Io("Created Markdown file is unreadable".into()))
+            })
+        }
         SidebarEntryKind::Folder => create_directory_impl(&candidate.to_string_lossy()),
     }
 }
@@ -1016,10 +1018,22 @@ mod tests {
         let path = dir.path().join("exists.md");
         fs::write(&path, "do not overwrite").unwrap();
 
-        let result = create_file_impl(&path.to_string_lossy());
+        let result = create_file_impl(&path.to_string_lossy(), None);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AppError::AlreadyExists(_)));
         assert_eq!(fs::read_to_string(path).unwrap(), "do not overwrite");
+    }
+
+    #[test]
+    fn test_create_file_writes_given_content() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("Meeting notes.md");
+
+        let created =
+            create_file_impl(&path.to_string_lossy(), Some("# Meeting notes\n\n")).unwrap();
+
+        assert_eq!(created.content, "# Meeting notes\n\n");
+        assert_eq!(fs::read_to_string(path).unwrap(), "# Meeting notes\n\n");
     }
 
     #[test]

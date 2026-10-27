@@ -23,6 +23,7 @@ import { useOpenFile } from "@/hooks/use-tabs";
 import { useBooleanSetting, useSetting } from "@/hooks/use-settings";
 import { useWorkspaceRoot } from "@/hooks/use-workspace";
 import * as tauri from "@/lib/tauri";
+import { fillEmptyNoteTitle } from "@/lib/new-note";
 import { getFileStem, getParentDir } from "@/lib/paths";
 import { useMoveEntry } from "./use-move-entry";
 import { useTreeDrag } from "./use-tree-drag";
@@ -221,6 +222,7 @@ export function FileTree({
           return;
         }
         await applyPathChange(entry, newPath);
+        if (!entry.is_dir) await fillEmptyNoteTitle(newPath, trimmed);
       } catch (error) {
         window.alert(`Failed to rename: ${error instanceof Error ? error.message : String(error)}`);
       }
