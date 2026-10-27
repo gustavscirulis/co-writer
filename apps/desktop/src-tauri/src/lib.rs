@@ -11,6 +11,8 @@ mod legacy_app_data;
 #[cfg(target_os = "macos")]
 mod macos;
 pub mod open_target;
+#[cfg(target_os = "macos")]
+mod spelling;
 mod state;
 #[cfg(desktop)]
 mod updater;
@@ -39,6 +41,8 @@ const CLI_MENU_UNINSTALL_LABEL: &str = "Uninstall 'cowriter' Command Line Toolâ€
 struct CliMenuItem(MenuItem<tauri::Wry>);
 
 pub(crate) const MAIN_WINDOW_LABEL: &str = "main";
+#[cfg(desktop)]
+const EDIT_MENU_TITLE: &str = "Edit";
 
 /// Push an open payload into the target window's pending-open queue and emit
 /// the notification so the frontend in that window drains it. Events are
@@ -335,7 +339,7 @@ fn install_app_menu(
             .build()?
     };
 
-    let edit_submenu = SubmenuBuilder::new(app, "Edit")
+    let edit_submenu = SubmenuBuilder::new(app, EDIT_MENU_TITLE)
         .undo()
         .redo()
         .separator()
@@ -359,6 +363,8 @@ fn install_app_menu(
         .build()?;
 
     app.set_menu(menu)?;
+    #[cfg(target_os = "macos")]
+    spelling::install_menu(EDIT_MENU_TITLE);
 
     let menu_items = updater::UpdaterMenuItems { check: check_item };
     app.manage(updater::UpdaterManager::new(menu_items, app_data_dir));
@@ -521,6 +527,8 @@ fn handle_single_instance(app: &tauri::AppHandle, argv: Vec<String>) {
 pub fn run() {
     let context = tauri::generate_context!();
     legacy_app_data::import(&context.config().identifier);
+    #[cfg(target_os = "macos")]
+    spelling::register_defaults();
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {

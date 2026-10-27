@@ -4,7 +4,7 @@
 
 - A new note's name is now its heading. Name it in ⌘N, or rename a new note in the sidebar, and it opens with that title and the caret on the line below, ready to write.
 
-- The editor now checks your spelling. Misspelled words get the standard macOS red underline.
+- The editor now checks your spelling. Misspelled words get the standard macOS red underline. Edit › Spelling and Grammar lets you turn it off, check grammar too, or open the spelling panel (⌘:). Automatic spelling correction starts off so macOS doesn't rewrite your markdown, but you can turn it on from the same menu.
 
 ## 2026-10-26
 
