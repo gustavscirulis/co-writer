@@ -43,6 +43,8 @@ These shortcuts are bound to the native app menu (Tauri menu accelerators) rathe
 | ----------- | --------------------------------------------------------------------- |
 | Cmd+,       | Open Preferences (Settings tab) in the focused window                 |
 | Cmd+Shift+C | Copy as Rich Text: the editor selection as formatted HTML (Edit menu) |
+| Cmd+:       | Show Spelling and Grammar panel (Edit › Spelling and Grammar)         |
+| Cmd+;       | Check Document Now: jump to the next misspelling                      |
 
 ## Editor Formatting
 
