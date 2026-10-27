@@ -19,6 +19,8 @@
 
 ## Done
 
+- New notes take their name as the heading: ⌘N writes `# Name` plus a blank body line through `create_file`'s new optional `content`, and renaming a sidebar note that is still the empty `# ` template fills its heading (`fillEmptyNoteTitle` in `lib/new-note.ts`, skipped for notes open in a tab). `newNoteCaret` puts the caret after an empty heading or on the line below a titled one. Unit tests cover the template, the caret and the fill; not yet tried in the native app.
+
 - Add a prominent macOS download link to GitHub Releases at the top of the README.
 
 - Compaction status in Chat: [`SPECs/chat-compaction-status.md`](SPECs/chat-compaction-status.md). Claude's `system/status` + `compact_boundary` and Codex's `contextCompaction` item both map to new `compacting`/`compacted` stream events. Activity reads "Compacting conversation…", and a "Conversation compacted" divider is stored on the last visible message (`compacted: true`), so it persists with the chat. Unit tests replay the real Claude Code 2.1.310 `/compact` stream and a Codex compaction item. Not yet tried in the native app. `/compact` is now the one Claude built-in `parse_skills` (`capabilities.rs`) keeps, so it shows in the slash menu. Checked against the real CLI: it compacts a resumed session with `<writer_context>` appended, and answers "Not enough messages to compact." when there is nothing to summarise. Codex has no `/compact` yet; it would need `thread/compact/start` instead of `turn/start`.

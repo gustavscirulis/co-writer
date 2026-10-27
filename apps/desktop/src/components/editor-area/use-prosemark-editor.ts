@@ -17,6 +17,7 @@ import { findHeadingBySlug } from "./link-navigation";
 import { advanceViewportParse } from "./viewport-parse";
 import * as editorApi from "@/hooks/editor-api";
 import { useReloadVersion } from "@/hooks/use-tabs";
+import { newNoteCaret } from "@/lib/new-note";
 import { getFileName } from "@/lib/paths";
 import { consumePendingAnchor } from "@/lib/pending-anchor";
 import { logTimeline, mark } from "@/lib/startup-metrics";
@@ -27,15 +28,10 @@ function resolveScrollContainer(root: HTMLElement, getScrollContainer?: () => HT
 }
 
 function restoreCursorPosition(view: EditorView, cursorPos: number) {
-  let pos: number;
-  if (cursorPos > 0) {
-    pos = Math.min(cursorPos, view.state.doc.length);
-  } else if (view.state.doc.toString() === "# ") {
-    // New-file template from create_file_impl is "# "; land caret after it so the user can type the title immediately.
-    pos = 2;
-  } else {
-    pos = 0;
-  }
+  const pos =
+    cursorPos > 0
+      ? Math.min(cursorPos, view.state.doc.length)
+      : (newNoteCaret(view.state.doc.toString()) ?? 0);
   view.dispatch({ selection: { anchor: pos } });
 }
 
