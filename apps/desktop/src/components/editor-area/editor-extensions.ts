@@ -147,5 +147,7 @@ export function createEditorExtensions(
     storeSyncExtension(getFilePath),
     editorClipboardExtension(getFilePath, isDisposed),
     focusOnRevealExtension(isDisposed),
+    // CodeMirror defaults spellcheck off; autocorrect stays off so macOS never rewrites markdown.
+    EditorView.contentAttributes.of({ spellcheck: "true" }),
   ];
 }

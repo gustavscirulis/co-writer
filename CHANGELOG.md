@@ -4,6 +4,8 @@
 
 - A new note's name is now its heading. Name it in ⌘N, or rename a new note in the sidebar, and it opens with that title and the caret on the line below, ready to write.
 
+- The editor now checks your spelling. Misspelled words get the standard macOS red underline.
+
 ## 2026-10-26
 
 - The README now links directly to GitHub Releases for downloading the macOS app.
