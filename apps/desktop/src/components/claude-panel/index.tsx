@@ -17,8 +17,8 @@ import { MessageList } from "./message-list";
 const HEADER_BUTTON =
   "grid size-7 place-items-center rounded-[7px] text-[var(--text-icon-muted)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] disabled:opacity-40";
 
-export function clampChatWidth(width: number, maxWidth = window.innerWidth * 0.5) {
-  return Math.max(260, Math.min(560, maxWidth, Math.round(width)));
+export function clampChatWidth(width: number, maxWidth: number) {
+  return Math.max(260, Math.min(maxWidth, Math.round(width)));
 }
 
 export function ClaudePanel({ maxWidth }: { maxWidth: number }) {

@@ -56,7 +56,7 @@ function WorkspaceLayout({ showWelcome }: { showWelcome: boolean }) {
   const chatVisible = !showWelcome && activeShowsChat && (chatPreferred || permissions.length > 0);
   const maxChatWidth = Math.max(
     260,
-    Math.min(560, viewportWidth - (isSidebarCollapsed ? 0 : draftSidebarWidth) - 320),
+    viewportWidth - (isSidebarCollapsed ? 0 : draftSidebarWidth) - 320,
   );
   const tabChromeLeft = isSidebarCollapsed ? 132 : draftSidebarWidth + 12;
 

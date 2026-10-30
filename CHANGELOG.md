@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-30
+
+- You can now drag the Co-writer panel as wide as you like. It used to stop at 560px; now it only stops where the editor would get too narrow to use.
+
 ## 2026-10-27
 
 - A new note's name is now its heading. Name it in ⌘N, or rename a new note in the sidebar, and it opens with that title and the caret on the line below, ready to write.
