@@ -2,6 +2,8 @@
 
 ## 2026-11-04
 
+- The update window now shows what's new in the release, using the same summary as GitHub. Notes are selectable and scroll inside a wider native window, with Install and Restart and Later always visible.
+
 - You can now select and copy text while looking at an older version in version history, tables included. Table cells copy as tab-separated text, so they paste into a spreadsheet. The old version still can't be edited.
 
 ## 2026-10-30

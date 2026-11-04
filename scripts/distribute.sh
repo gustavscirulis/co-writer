@@ -45,6 +45,9 @@ if [ ! -s "$NOTES_FILE" ] || ! grep -q '[^[:space:]]' "$NOTES_FILE"; then
   echo "Error: release notes are empty: $NOTES_FILE"
   exit 1
 fi
+# The build below changes directories. GitHub and the manifest must still read
+# the same file when --notes-file was supplied as a relative path.
+NOTES_FILE="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$NOTES_FILE")"
 
 CURRENT_BRANCH=$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)
 if [ "$CURRENT_BRANCH" != "master" ]; then
@@ -202,27 +205,11 @@ esac
 SIGNATURE=$(cat "$SIG_FILE")
 TAR_NAME=$(basename "$TAR_FILE")
 PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-NOTES="Co-writer $TAG"
 DOWNLOAD_URL="https://github.com/$RELEASE_REPO/releases/download/$TAG/$TAR_NAME"
 
 LATEST_JSON="$BUNDLE_DIR/latest.json"
-python3 - "$LATEST_JSON" "$VERSION" "$NOTES" "$PUB_DATE" "$TARGET" "$SIGNATURE" "$DOWNLOAD_URL" <<'PY'
-import json, sys
-out_path, version, notes, pub_date, target, signature, url = sys.argv[1:]
-payload = {
-    "version": version,
-    "notes": notes,
-    "pub_date": pub_date,
-    "platforms": {
-        target: {
-            "signature": signature,
-            "url": url,
-        }
-    },
-}
-with open(out_path, "w") as f:
-    json.dump(payload, f, indent=2)
-PY
+python3 "$SCRIPT_DIR/release_manifest.py" "$LATEST_JSON" "$VERSION" "$NOTES_FILE" \
+  "$PUB_DATE" "$TARGET" "$SIGNATURE" "$DOWNLOAD_URL"
 
 echo "Built: latest.json ($TARGET)"
 
