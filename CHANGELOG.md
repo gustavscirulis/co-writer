@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-04
+
+- You can now select and copy text while looking at an older version in version history, tables included. Table cells copy as tab-separated text, so they paste into a spreadsheet. The old version still can't be edited.
+
 ## 2026-10-30
 
 - You can now drag the Co-writer panel as wide as you like. It used to stop at 560px; now it only stops where the editor would get too narrow to use.

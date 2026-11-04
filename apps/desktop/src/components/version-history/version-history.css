@@ -11,6 +11,11 @@
   --writer-diff-deleted-line: color-mix(in srgb, #ff7a70 6%, transparent);
 }
 
+/* Selectable but not writable, so a caret would only suggest otherwise. */
+.writer-history-preview .cm-cursorLayer {
+  display: none;
+}
+
 .cm-editor.writer-history-preview.cm-merge-b .cm-changedLine {
   background-color: var(--writer-diff-inserted-line);
 }

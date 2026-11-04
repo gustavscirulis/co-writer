@@ -1,9 +1,10 @@
 import { ChangeSet, EditorState, Facet, Text } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { EditorView, drawSelection } from "@codemirror/view";
 import { Chunk, getChunks, unifiedMergeView } from "@codemirror/merge";
 import type { Parser } from "@lezer/common";
 import { prosemarkBasicSetup, prosemarkBaseThemeSetup } from "@/lib/prosemark-core/main";
 import { headingWeightHighlight, writerMarkdown } from "@/components/editor-area/editor-extensions";
+import { dragFreezeExtensions } from "@/components/editor-area/drag-selection-gate";
 import { headingDecorations } from "@/components/editor-area/heading-decorations";
 import { imageSrcResolver } from "@/components/editor-area/image-src-resolver";
 import { mathDecorations } from "@/components/editor-area/math-decorations";
@@ -70,6 +71,7 @@ function pairTables(doc: Text, original: Text, parser: Parser) {
 
 // The live editor's rendering without anything that writes back to the note
 // (store sync, feedback anchors, Mermaid's editable canvas, undo history).
+// Read-only but still focusable, so text can be selected and copied.
 export function historyPreviewState(
   body: string,
   original: string,
@@ -88,6 +90,8 @@ export function historyPreviewState(
     extensions: [
       markdown,
       prosemarkBasicSetup(),
+      dragFreezeExtensions,
+      drawSelection(),
       prosemarkBaseThemeSetup(),
       headingWeightHighlight,
       viewportParsePlugin,
@@ -98,7 +102,6 @@ export function historyPreviewState(
       headingDecorations,
       imageSrcResolver(getFilePath),
       EditorState.readOnly.of(true),
-      EditorView.editable.of(false),
       EditorState.transactionFilter.of((tr) => (tr.docChanged ? [] : tr)),
       unifiedMergeView({
         original: mergeOriginal,

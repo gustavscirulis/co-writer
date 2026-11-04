@@ -1247,6 +1247,50 @@ const tableSelectionRedirect = EditorView.updateListener.of((update) => {
   queueMicrotask(() => focusTableAtSelection(update.view));
 });
 
+const closestTable = (node: Node | null) =>
+  (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>(
+    ".cm-table-widget",
+  ) ?? null;
+
+/** Cells split by tabs and rows by newlines, leaving out what a diff shows as deleted. */
+function tableSelectionText(fragment: DocumentFragment): string {
+  const removed =
+    ".cm-table-hint, .cm-table-row-deleted, .cm-deletedText, :is(td, th):not([data-column])";
+  for (const node of fragment.querySelectorAll(removed)) node.remove();
+  const rows = [...fragment.querySelectorAll("tr")];
+  if (rows.length === 0) return fragment.textContent ?? "";
+  return rows
+    .map((row) => [...row.children].map((cell) => (cell.textContent ?? "").trim()).join("\t"))
+    .join("\n");
+}
+
+// CodeMirror leaves a selection that starts inside a table to the widget (a
+// read-only table has no active cell), so its copy would take the caret's line.
+const tableCopy = EditorView.domEventHandlers({
+  copy(event, view) {
+    const selection = document.getSelection();
+    const table = closestTable(selection?.anchorNode ?? null);
+    const editor = table && tableEditors.get(table);
+    if (!editor || !selection?.rangeCount || selection.isCollapsed || !event.clipboardData) {
+      return false;
+    }
+    const range = selection.getRangeAt(0);
+    const startsIn = editor.dom.contains(range.startContainer);
+    const endsIn = editor.dom.contains(range.endContainer);
+    const from = editor.from();
+    const text =
+      startsIn && endsIn
+        ? tableSelectionText(range.cloneContents())
+        : view.state.sliceDoc(
+            startsIn ? from : view.posAtDOM(range.startContainer, range.startOffset),
+            endsIn ? from + editor.raw.length : view.posAtDOM(range.endContainer, range.endOffset),
+          );
+    event.clipboardData.setData("text/plain", text);
+    event.preventDefault();
+    return true;
+  },
+});
+
 const tableTheme = EditorView.baseTheme({
   ".cm-table-widget": {
     padding: `${tableWidgetVerticalPaddingEm / 2}em 0`,
@@ -1362,5 +1406,5 @@ const tableTheme = EditorView.baseTheme({
 });
 
 export function tableDecorations(): Extension {
-  return [tableField, tableKeymap, tableSelectionRedirect, tableTheme];
+  return [tableField, tableKeymap, tableSelectionRedirect, tableCopy, tableTheme];
 }
