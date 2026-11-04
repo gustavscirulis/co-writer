@@ -359,8 +359,16 @@ fn install_app_menu(
     let menu = MenuBuilder::new(app)
         .item(&app_submenu)
         .item(&edit_submenu)
-        .item(&window_submenu)
-        .build()?;
+        .item(&window_submenu);
+    #[cfg(debug_assertions)]
+    let menu = menu.item(
+        &SubmenuBuilder::new(app, "Developer")
+            .text("updater.preview", "Preview Update Window")
+            .text("updater.preview-long", "Preview Long Release Notes")
+            .text("updater.preview-empty", "Preview Update Without Notes")
+            .build()?,
+    );
+    let menu = menu.build()?;
 
     app.set_menu(menu)?;
     #[cfg(target_os = "macos")]
@@ -377,6 +385,14 @@ fn install_app_menu(
 
     app.on_menu_event(|app, event| match event.id().0.as_str() {
         "updater.check" => updater::start_check(app.clone(), true),
+        #[cfg(debug_assertions)]
+        "updater.preview" => updater::start_preview(app.clone(), updater::PreviewKind::Standard),
+        #[cfg(debug_assertions)]
+        "updater.preview-long" => updater::start_preview(app.clone(), updater::PreviewKind::Long),
+        #[cfg(debug_assertions)]
+        "updater.preview-empty" => {
+            updater::start_preview(app.clone(), updater::PreviewKind::WithoutNotes)
+        }
         "preferences.open" => emit_to_focused_window(app, "menu:open-preferences"),
         "edit.copy-rich-text" => emit_to_focused_window(app, "menu:copy-rich-text"),
         #[cfg(target_os = "macos")]

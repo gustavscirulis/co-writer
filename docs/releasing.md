@@ -46,6 +46,32 @@ From the repo root, on a clean `master`:
 
 By default the release notes are the latest dated section of `CHANGELOG.md`. To write shorter, user-facing notes instead, pass `--notes-file /path/to/notes.md`.
 
+The same UTF-8 notes file supplies both the GitHub release body and
+`latest.json.notes`. The native update window displays that summary with
+selectable text and scrolling. For a release covering several changelog dates,
+use `--notes-file` to include the complete summary. If you edit the draft's notes
+on GitHub afterwards, update `latest.json.notes` to match before publishing.
+
+### Preview the update window
+
+Run `vp install`, then `vp run desktop#dev` from the repo root. In the native
+**Developer** menu, choose **Preview Update Window**, **Preview Long Release
+Notes**, or **Preview Update Without Notes**. These use the production native
+sheet with the published 0.8.3 summary, a longer scrolling fixture, or no notes.
+Try text selection/copying, scrolling to the end, Escape, both buttons, and
+light/dark appearance. The sheet fits the screen and keeps its buttons visible.
+
+In previews, **Install and Restart** and **Later** both only close the sheet.
+They do not download, install, restart, or save a dismissed version. Previews
+cannot overlap an active update operation. The menu, handlers and fixtures are
+compiled only with Rust's `debug_assertions` (normal `tauri dev` builds); they
+are absent from release builds.
+
+Test manifest generation without signing or uploading anything with
+`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_*.py'`.
+
+### Release steps
+
 The script:
 
 1. Checks you're on `master` with a clean tree, then checks signing: the Developer ID identity, the notary profile, the updater key, and that the key matches the pubkey and endpoint in `tauri.conf.json`. It asks for the updater key password (press Enter if it has none; set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to skip the prompt).
