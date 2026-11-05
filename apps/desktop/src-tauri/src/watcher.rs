@@ -376,6 +376,30 @@ fn publish_prepared_index_for_snapshot(
     }
 }
 
+/// Self-writes skip the reload echo but must still join the index, or a
+/// folder holding only a just-renamed note reads as Markdown-free and hides.
+fn index_self_written_markdown(
+    state: &WorkspaceState,
+    root: &Path,
+    epoch: u64,
+    path: &Path,
+) -> bool {
+    if path.extension().and_then(|e| e.to_str()) != Some("md")
+        || !path.is_file()
+        || state.file_index.read().iter().any(|file| file.path == path)
+    {
+        return false;
+    }
+    let found = vec![discovered_file(
+        path,
+        crate::commands::fs::modified_time(path),
+    )];
+    publish_prepared_index_for_snapshot(state, root, epoch, || {
+        prepare_subtree_merge(state, found.clone(), root)
+    });
+    true
+}
+
 #[cfg(test)]
 fn add_subtree_to_index(state: &WorkspaceState, dir: &Path, root: &Path) {
     let prepared = prepare_subtree_merge(state, discover_subtree(dir), root);
@@ -468,6 +492,21 @@ pub fn start_watcher(
             }
 
             let mut rebuild_ignore = false;
+            let emit_parent_changed = |path: &Path| {
+                let Some(parent) = path.parent() else {
+                    return;
+                };
+                wlog!("emit fs:directory-changed (parent) {}", parent.display());
+                let parent_payload = FileChangeEvent {
+                    path: parent.to_string_lossy().to_string(),
+                    kind: "modified".to_string(),
+                    workspace: Some(WorkspaceIdentity {
+                        root: watched_root.to_string_lossy().into_owned(),
+                        epoch: captured_epoch,
+                    }),
+                };
+                let _ = handle.emit_to(label.clone(), "fs:directory-changed", &parent_payload);
+            };
 
             for event in pending.drain(..) {
                 for path in &event.paths {
@@ -505,6 +544,16 @@ pub fn start_watcher(
                     }
 
                     if is_self_write(&state, path) {
+                        if !is_dir
+                            && index_self_written_markdown(
+                                &state,
+                                &watched_root,
+                                captured_epoch,
+                                path,
+                            )
+                        {
+                            emit_parent_changed(path);
+                        }
                         continue;
                     }
 
@@ -658,22 +707,7 @@ pub fn start_watcher(
                     // non-`.md` file changes, folder deletes, and Finder
                     // moves never trigger a sidebar refresh.
                     if !is_dir {
-                        if let Some(parent) = path.parent() {
-                            wlog!("emit fs:directory-changed (parent) {}", parent.display());
-                            let parent_payload = FileChangeEvent {
-                                path: parent.to_string_lossy().to_string(),
-                                kind: "modified".to_string(),
-                                workspace: Some(WorkspaceIdentity {
-                                    root: watched_root.to_string_lossy().into_owned(),
-                                    epoch: captured_epoch,
-                                }),
-                            };
-                            let _ = handle.emit_to(
-                                label.clone(),
-                                "fs:directory-changed",
-                                &parent_payload,
-                            );
-                        }
+                        emit_parent_changed(path);
                     }
                 }
             }
@@ -1016,6 +1050,60 @@ mod tests {
         add_subtree_to_index(&state, &root, &root);
         add_subtree_to_index(&state, &root, &root);
         assert_eq!(state.file_index.read().len(), 1);
+    }
+
+    #[test]
+    fn self_written_note_in_new_folder_keeps_the_folder_in_the_sidebar() {
+        // Regression: renaming a new note writes its heading, so the watcher
+        // saw the new path only as a self-write and never indexed it. The
+        // folder then read as Markdown-free and vanished from the sidebar.
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        let folder = root.join("Untitled Folder");
+        std::fs::create_dir(&folder).unwrap();
+        let note = folder.join("Ideas.md");
+        std::fs::write(&note, "# Ideas\n\n").unwrap();
+        std::fs::write(folder.join("data.txt"), "x").unwrap();
+
+        let state = WorkspaceState::default();
+        let epoch = state.replace_workspace_root(root.clone());
+        state.index_ready.store(true, Ordering::Relaxed);
+
+        assert!(index_self_written_markdown(&state, &root, epoch, &note));
+        assert!(!index_self_written_markdown(&state, &root, epoch, &note));
+        assert_eq!(state.file_index.read().len(), 1);
+        assert!(state.dirs_with_markdown.read().contains(&folder));
+
+        let entries =
+            crate::commands::fs::read_directory_impl(&root.to_string_lossy(), Some(&state))
+                .unwrap();
+        assert!(entries
+            .iter()
+            .any(|entry| entry.path == folder.to_string_lossy()));
+    }
+
+    #[test]
+    fn self_written_non_markdown_or_missing_paths_are_not_indexed() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        std::fs::write(root.join("data.txt"), "x").unwrap();
+
+        let state = WorkspaceState::default();
+        let epoch = state.replace_workspace_root(root.clone());
+
+        assert!(!index_self_written_markdown(
+            &state,
+            &root,
+            epoch,
+            &root.join("data.txt")
+        ));
+        assert!(!index_self_written_markdown(
+            &state,
+            &root,
+            epoch,
+            &root.join("gone.md")
+        ));
+        assert!(state.file_index.read().is_empty());
     }
 
     #[test]
