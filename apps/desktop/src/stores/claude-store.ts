@@ -533,7 +533,7 @@ async function reloadAfterEdit(run: Run, edit: Edit) {
       continue;
     }
     if (file.diskContent !== content) {
-      markAgentReload(path, file.reloadVersion + 1, file.frontmatter);
+      markAgentReload(path, file.reloadVersion + 1, file.frontmatter, run.turnId);
       useEditorStore.getState().reloadFromDisk(path, content);
       synchronizeEditorView(path);
       consumeAgentReload(path, file.reloadVersion + 1);

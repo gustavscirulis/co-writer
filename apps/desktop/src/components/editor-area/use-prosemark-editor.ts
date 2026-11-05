@@ -119,7 +119,12 @@ export function useProsemarkEditor(
           userEvent: "writer.metadata",
         });
         view.dispatch(
-          agentReloadTransaction(view.state.doc.toString(), latest.content, latest.frontmatter),
+          agentReloadTransaction(
+            view.state.doc.toString(),
+            latest.content,
+            latest.frontmatter,
+            reload.turnId,
+          ),
         );
         prevReloadVersionRef.current = latest.reloadVersion;
       },
@@ -263,6 +268,7 @@ export function useProsemarkEditor(
               view.state.doc.toString(),
               content,
               file?.frontmatter ?? null,
+              agentReload.turnId,
             ),
             scrollIntoView: false,
           }

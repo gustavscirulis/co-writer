@@ -90,7 +90,7 @@ export function registerPendingEditorFlush(path: () => string, flush: () => void
   };
 }
 const listeners = new Set<() => void>();
-const reloads = new Map<string, { version: number; frontmatter: string | null }>();
+const reloads = new Map<string, { version: number; frontmatter: string | null; turnId?: string }>();
 export function isAgentEditing(path?: string) {
   return path === undefined ? locks.size > 0 || resets > 0 : locks.has(documentPath(path));
 }
@@ -149,8 +149,13 @@ export function subscribeAgentEditing(listener: () => void) {
     listeners.delete(listener);
   };
 }
-export function markAgentReload(path: string, version: number, frontmatter: string | null) {
-  reloads.set(path, { version, frontmatter });
+export function markAgentReload(
+  path: string,
+  version: number,
+  frontmatter: string | null,
+  turnId?: string,
+) {
+  reloads.set(path, { version, frontmatter, turnId });
 }
 export function getAgentReload(path: string, version: number) {
   const reload = reloads.get(path);
