@@ -34,7 +34,22 @@ The authoritative version lives in `apps/desktop/src-tauri/tauri.conf.json`; the
 3. `apps/desktop/package.json` — `version` field
 4. `apps/desktop/src-tauri/Cargo.lock` — refresh with `cargo update -p desktop --offline` from `apps/desktop/src-tauri/`
 
-Use a patch bump for fixes, a minor bump for new user-visible features. Commit as `Bump version to <version>` on `master`. Do not push or tag manually; the script does both.
+Use a patch bump for fixes, a minor bump for new user-visible features.
+
+### Write the release summary
+
+Write `release-notes/<version>.md`. It is the GitHub release body and the text in the in-app update window, so write it for people who use Co-writer, not for us. Don't paste the changelog. Summarise it.
+
+Find what shipped since the last release with `git diff v<previous>..HEAD -- CHANGELOG.md`. The added bullets cover every date since that tag, not just the latest section.
+
+- 3–5 bullets, one sentence each, two at most.
+- The biggest change first. Say what the reader can now do or will notice.
+- Merge small fixes into one "Fixes …" bullet.
+- No PR numbers, file names, function names or internal terms.
+
+See `release-notes/` for earlier examples.
+
+Commit the summary with the version bump as `Bump version to <version>` on `master`. Do not push or tag manually; the script does both.
 
 ## Step 2 — Run distribute.sh
 
@@ -44,13 +59,10 @@ From the repo root, on a clean `master`:
 ./scripts/distribute.sh
 ```
 
-By default the release notes are the latest dated section of `CHANGELOG.md`. To write shorter, user-facing notes instead, pass `--notes-file /path/to/notes.md`.
-
-The same UTF-8 notes file supplies both the GitHub release body and
-`latest.json.notes`. The native update window displays that summary with
-selectable text and scrolling. For a release covering several changelog dates,
-use `--notes-file` to include the complete summary. If you edit the draft's notes
-on GitHub afterwards, update `latest.json.notes` to match before publishing.
+The script reads the release notes from `release-notes/<version>.md` and stops
+before anything else if that file is missing or blank. The same file supplies
+both the GitHub release body and `latest.json.notes`. The native update window
+displays that summary with selectable text and scrolling.
 
 ### Preview the update window
 
@@ -86,7 +98,7 @@ Expect several minutes, mostly the release build and notarization.
 
 ## Step 3 — Publish
 
-Open the draft URL, check the three assets and the notes, and click **Publish release**. The in-app updater ignores drafts. Share the DMG's download link from the published release.
+Open the draft URL, check the three assets and the notes, and click **Publish release**. If you edit the notes on GitHub, update `latest.json.notes` and `release-notes/<version>.md` to match. The in-app updater ignores drafts. Share the DMG's download link from the published release.
 
 Confirm `https://github.com/gustavscirulis/co-writer/releases/latest/download/latest.json` shows the new version.
 

@@ -9,45 +9,33 @@ TAURI_CONF="$ROOT_DIR/apps/desktop/src-tauri/tauri.conf.json"
 NOTARY_PROFILE="${WRITER_NOTARY_PROFILE:-writer-notary}"
 export TAURI_SIGNING_PRIVATE_KEY="${TAURI_SIGNING_PRIVATE_KEY:-$HOME/.tauri/writer-updater.key}"
 
+VERSION=$(python3 -c "import json; print(json.load(open('$TAURI_CONF'))['version'])")
+TAG="v$VERSION"
+NOTES_FILE="$ROOT_DIR/release-notes/$VERSION.md"
+
 usage() {
-  echo "Usage: $0 [--notes-file <path>]"
-  echo "Without --notes-file, the latest section of CHANGELOG.md becomes the release notes."
+  echo "Usage: $0"
+  echo "The release notes are read from release-notes/<version>.md."
 }
 
-NOTES_FILE=""
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --notes-file)
-      NOTES_FILE="$2"
-      shift 2
-      ;;
-    --notes-file=*)
-      NOTES_FILE="${1#*=}"
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Error: unknown argument: $1"
-      usage
-      exit 1
-      ;;
-  esac
-done
+case "${1:-}" in
+  "") ;;
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown argument: $1"
+    usage
+    exit 1
+    ;;
+esac
 
-if [ -z "$NOTES_FILE" ]; then
-  NOTES_FILE="$(mktemp -t writer-release-notes)"
-  awk '/^## /{n++; if (n == 2) exit; next} n == 1' "$ROOT_DIR/CHANGELOG.md" >"$NOTES_FILE"
-fi
 if [ ! -s "$NOTES_FILE" ] || ! grep -q '[^[:space:]]' "$NOTES_FILE"; then
-  echo "Error: release notes are empty: $NOTES_FILE"
+  echo "Error: release notes are missing or empty: $NOTES_FILE"
+  echo "Write a short summary of this release there first (see docs/releasing.md)."
   exit 1
 fi
-# The build below changes directories. GitHub and the manifest must still read
-# the same file when --notes-file was supplied as a relative path.
-NOTES_FILE="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$NOTES_FILE")"
 
 CURRENT_BRANCH=$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)
 if [ "$CURRENT_BRANCH" != "master" ]; then
@@ -113,9 +101,6 @@ export TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 # Tauri notarizes on its own when these are set; notarization happens below
 # through the keychain profile instead, so keep Tauri to signing only.
 unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_PATH
-
-VERSION=$(python3 -c "import json; print(json.load(open('$TAURI_CONF'))['version'])")
-TAG="v$VERSION"
 
 # --- Git pre-flight: in sync with origin, tag unused. ---
 
