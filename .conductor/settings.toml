@@ -1,0 +1,10 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+setup = "vp install"
+
+[scripts.run.Run-dev]
+available_in = ["local"]
+command = "vp run dev"
+default = true
+icon = "play"
