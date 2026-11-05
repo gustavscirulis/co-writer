@@ -6,18 +6,30 @@
   --writer-agent-new: color-mix(in srgb, #3ccf7a 12%, transparent);
   --writer-agent-new-fresh: color-mix(in srgb, #3ccf7a 24%, transparent);
 }
-.writer-agent-new {
-  border-radius: 2px;
+.writer-agent-new,
+.writer-agent-new-block {
   background-color: var(--writer-agent-new);
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
   transition: background-color 700ms ease-out;
 }
-.cm-editor[data-agent-fresh] .writer-agent-new {
+.writer-agent-new {
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.writer-agent-new-block-layer {
+  pointer-events: none;
+}
+.writer-agent-new-block {
+  position: absolute;
+  border-radius: 6px;
+}
+.cm-editor[data-agent-fresh] .writer-agent-new,
+.cm-editor[data-agent-fresh] .writer-agent-new-block {
   background-color: var(--writer-agent-new-fresh);
 }
 @media (prefers-reduced-motion: reduce) {
-  .writer-agent-new {
+  .writer-agent-new,
+  .writer-agent-new-block {
     transition: none;
   }
 }

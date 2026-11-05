@@ -4,6 +4,10 @@
 
 - After Co-writer edits a note, the words it added get a faint green tint so you can spot them. A phrase's tint clears when you edit it, and Co-writer's next turn replaces them all. Removed text isn't marked.
 
+- When Co-writer adds a list item, the tint no longer spills onto the bullet of the item after it, and that bullet stays in line with the others.
+
+- Co-writer's tint now shows in tables too, on the new words in each cell. Diagrams, HTML blocks, embeds and images that Co-writer adds or changes get the tint behind the whole block.
+
 - A new folder no longer disappears from the sidebar after you create a note inside it and give the note a name.
 
 ## 2026-11-04
