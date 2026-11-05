@@ -724,6 +724,7 @@ pub async fn rename_entry(
     blocking(move || {
         let from = fs::canonicalize(&old_path)?;
         rename_entry_impl(&old_path, &new_path)?;
+        crate::watcher::rename_in_index(&state, Path::new(&old_path), Path::new(&new_path));
         let to = fs::canonicalize(&new_path)?;
         crate::commands::history::move_entry_history(&state, &from, &to);
         Ok(DocumentMove {
