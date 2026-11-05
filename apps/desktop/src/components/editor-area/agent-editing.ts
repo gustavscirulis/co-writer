@@ -8,7 +8,8 @@ import {
 } from "@codemirror/state";
 import { invertedEffects, isolateHistory } from "@codemirror/commands";
 import { isAgentEditing, subscribeAgentEditing } from "@/lib/agent-turn";
-import { textDiff } from "@/lib/text-diff";
+import { insertedWordRanges, textDiff } from "@/lib/text-diff";
+import { agentEditHighlight, showAgentEdit } from "./agent-edit-highlight";
 import { EditorView } from "@codemirror/view";
 
 export const agentFrontmatter = StateEffect.define<string | null>();
@@ -33,6 +34,7 @@ export function agentEditingExtensions(
 ): Extension {
   return [
     agentFrontmatterField.init(() => frontmatter),
+    agentEditHighlight,
     invertedEffects.of((tr) =>
       tr.effects.some((e) => e.is(agentFrontmatter))
         ? [agentFrontmatter.of(tr.startState.field(agentFrontmatterField))]
@@ -55,10 +57,18 @@ export function watchAgentEditing(view: EditorView, compartment: Compartment, pa
     view.dispatch({ effects: compartment.reconfigure(agentLock(path())) }),
   );
 }
-export function agentReloadTransaction(before: string, after: string, frontmatter: string | null) {
+/** `turnId` marks a Co-writer edit, whose new words get highlighted; restores pass none. */
+export function agentReloadTransaction(
+  before: string,
+  after: string,
+  frontmatter: string | null,
+  turnId?: string,
+) {
+  const effects: StateEffect<unknown>[] = [agentFrontmatter.of(frontmatter)];
+  if (turnId) effects.push(showAgentEdit.of({ turnId, ranges: insertedWordRanges(before, after) }));
   return {
     changes: textDiff(before, after),
-    effects: agentFrontmatter.of(frontmatter),
+    effects,
     annotations: [Transaction.addToHistory.of(true), isolateHistory.of("full")],
     userEvent: "writer.agent-reload",
   };

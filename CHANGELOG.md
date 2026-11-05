@@ -2,6 +2,8 @@
 
 ## 2026-11-05
 
+- After Co-writer edits a note, the words it added get a faint green tint so you can spot them. A phrase's tint clears when you edit it, and Co-writer's next turn replaces them all. Removed text isn't marked.
+
 - A new folder no longer disappears from the sidebar after you create a note inside it and give the note a name.
 
 ## 2026-11-04

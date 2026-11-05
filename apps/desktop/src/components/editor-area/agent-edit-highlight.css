@@ -1,0 +1,23 @@
+.cm-editor {
+  --writer-agent-new: color-mix(in srgb, #1f9d55 10%, transparent);
+  --writer-agent-new-fresh: color-mix(in srgb, #1f9d55 22%, transparent);
+}
+[data-theme="dark"] .cm-editor {
+  --writer-agent-new: color-mix(in srgb, #3ccf7a 12%, transparent);
+  --writer-agent-new-fresh: color-mix(in srgb, #3ccf7a 24%, transparent);
+}
+.writer-agent-new {
+  border-radius: 2px;
+  background-color: var(--writer-agent-new);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  transition: background-color 700ms ease-out;
+}
+.cm-editor[data-agent-fresh] .writer-agent-new {
+  background-color: var(--writer-agent-new-fresh);
+}
+@media (prefers-reduced-motion: reduce) {
+  .writer-agent-new {
+    transition: none;
+  }
+}

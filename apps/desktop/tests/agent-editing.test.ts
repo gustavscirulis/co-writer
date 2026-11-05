@@ -7,6 +7,7 @@ import {
   agentReloadTransaction,
   watchAgentEditing,
 } from "../src/components/editor-area/agent-editing";
+import { agentEditHighlightField } from "../src/components/editor-area/agent-edit-highlight";
 import { acquireAgentEditing, clearAgentEditing } from "../src/lib/agent-turn";
 import { EditorView } from "@codemirror/view";
 afterEach(clearAgentEditing);
@@ -106,4 +107,53 @@ test("the editor carries a wait-cursor marker only while its note is locked", ()
   release();
   expect(marked()).toBe(false);
   unwatch();
+});
+
+function highlighted(state: EditorState) {
+  const words: string[] = [];
+  state.field(agentEditHighlightField).decorations.between(0, state.doc.length, (from, to) => {
+    words.push(state.sliceDoc(from, to));
+  });
+  return words;
+}
+
+test("a Co-writer reload highlights its new words until the writer edits them", () => {
+  const editor = harness("One two. Three four.", null);
+  editor.change(
+    agentReloadTransaction("One two. Three four.", "One new two. Three four more.", null, "t1"),
+  );
+  expect(highlighted(editor.state)).toEqual(["new", "more"]);
+  editor.change({ changes: { from: 0, insert: "Yes. " } });
+  expect(highlighted(editor.state)).toEqual(["new", "more"]);
+  const at = editor.state.doc.toString().indexOf("new") + 1;
+  editor.change({ changes: { from: at, insert: "x" } });
+  expect(highlighted(editor.state)).toEqual(["more"]);
+});
+
+test("a restore reload highlights nothing", () => {
+  const editor = harness("One two.", null);
+  editor.change(agentReloadTransaction("One two.", "One new two.", null));
+  expect(highlighted(editor.state)).toEqual([]);
+});
+
+test("edits within one turn add up and the next turn replaces them", () => {
+  const editor = harness("A b.", null);
+  editor.change(agentReloadTransaction("A b.", "A one b.", null, "t1"));
+  editor.change(agentReloadTransaction("A one b.", "A one b two.", null, "t1"));
+  expect(highlighted(editor.state)).toEqual(["one", "two"]);
+  editor.change(agentReloadTransaction("A one b two.", "Three A one b two.", null, "t2"));
+  expect(highlighted(editor.state)).toEqual(["Three"]);
+});
+
+test("undoing the reload or swapping the note clears its highlights", () => {
+  const editor = harness("A b.", null);
+  editor.change(agentReloadTransaction("A b.", "A one b.", null, "t1"));
+  expect(undo(editor)).toBe(true);
+  expect(highlighted(editor.state)).toEqual([]);
+  editor.change(agentReloadTransaction("A b.", "A one b.", null, "t2"));
+  editor.change({
+    changes: { from: 0, to: editor.state.doc.length, insert: "A one b." },
+    userEvent: "writer.swap",
+  });
+  expect(highlighted(editor.state)).toEqual([]);
 });
