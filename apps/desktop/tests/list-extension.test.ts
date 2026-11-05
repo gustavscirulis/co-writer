@@ -1078,3 +1078,83 @@ describe("listDecorationsField", () => {
     );
   });
 });
+
+describe("ordered list renumbering", () => {
+  function edit(doc: string, remove: string, insert = "", userEvent = "delete.backward"): string {
+    const from = doc.indexOf(remove);
+    const state = makeState(doc);
+    return state
+      .update({ changes: { from, to: from + remove.length, insert }, userEvent })
+      .state.doc.toString();
+  }
+
+  test("deleting a row renumbers the rows after it", () => {
+    expect(edit("1. a\n2. b\n3. c\n4. d", "\n2. b")).toBe("1. a\n2. c\n3. d");
+  });
+
+  test("deleting the first row keeps the list's start", () => {
+    expect(edit("1. a\n2. b\n3. c", "1. a\n")).toBe("1. b\n2. c");
+    expect(edit("4. a\n5. b\n6. c", "4. a\n")).toBe("4. b\n5. c");
+  });
+
+  test("keeps the delimiter and renumbers past nine", () => {
+    const doc = Array.from({ length: 11 }, (_, i) => `${String(i + 1)}) x${String(i)}`).join("\n");
+    expect(edit(doc, "\n2) x1").split("\n").slice(8)).toEqual(["9) x9", "10) x10"]);
+  });
+
+  test("renumbers only the list the row was deleted from", () => {
+    expect(edit("1. a\n2. b\n3. c\n   1. x\n   2. y\n4. d", "\n2. b")).toBe(
+      "1. a\n2. c\n   1. x\n   2. y\n3. d",
+    );
+    expect(edit("1. a\n   1. x\n   2. y\n   3. z\n2. b", "\n   2. y")).toBe(
+      "1. a\n   1. x\n   2. z\n2. b",
+    );
+  });
+
+  test("pasting rows renumbers the rows after them", () => {
+    expect(edit("1. a\n2. b", "\n2. b", "\n2. x\n3. y\n2. b", "input.paste")).toBe(
+      "1. a\n2. x\n3. y\n4. b",
+    );
+  });
+
+  test("leaves all-same numbering alone", () => {
+    expect(edit("1. a\n1. b\n1. c", "\n1. b")).toBe("1. a\n1. c");
+  });
+
+  test("a number typed into a marker stays", () => {
+    expect(edit("1. a\n2. b\n3. c", "2", "5", "input.type")).toBe("1. a\n5. b\n3. c");
+  });
+
+  test("edits that aren't the user's are left alone", () => {
+    const doc = "1. a\n2. b\n3. c";
+    const from = doc.indexOf("\n2. b");
+    const state = makeState(doc).update({ changes: { from, to: from + 5 } }).state;
+    expect(state.doc.toString()).toBe("1. a\n3. c");
+  });
+
+  test("one undo restores the deleted row and the old numbers", () => {
+    const doc = "1. a\n2. b\n3. c";
+    const from = doc.indexOf("\n2. b");
+    let state = makeState(doc).update({
+      changes: { from, to: from + 5 },
+      userEvent: "delete.backward",
+    }).state;
+    expect(state.doc.toString()).toBe("1. a\n2. c");
+    undo({
+      state,
+      dispatch: (tr) => {
+        state = tr.state;
+      },
+    });
+    expect(state.doc.toString()).toBe(doc);
+  });
+
+  test("Tab and Shift-Tab renumber the rows left behind", () => {
+    expect(markedDoc(run(listIndent, makeMarked("1. a\n2. b|\n3. c")).state)).toBe(
+      "1. a\n   1. b|\n2. c",
+    );
+    expect(
+      markedDoc(run(listOutdent, makeMarked("1. a\n   1. x\n   2. y|\n   3. z\n2. b")).state),
+    ).toBe("1. a\n   1. x\n2. y|\n   1. z\n3. b");
+  });
+});

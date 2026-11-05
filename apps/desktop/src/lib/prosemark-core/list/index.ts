@@ -161,7 +161,8 @@ interface ParsedBulletTaskLine {
 // `isMarkerTrailingChar`, so the commands must too), optional task box.
 // Ordered lists keep lang-markdown's continuation for Enter inside an item;
 // Enter on an empty one and Tab/Shift-Tab renumbering go through the tree
-// (`emptyOrderedItemAt`, `orderedTargetNumber`). Every bullet/task command,
+// (`emptyOrderedItemAt`, `orderedTargetNumber`), and rows added or removed
+// renumber through `orderedListRenumber`. Every bullet/task command,
 // the caret guard, and the checkbox toggle go through `parseBulletTaskLine`;
 // don't add a second regex for "is this a list line".
 const BULLET_TASK_LINE_RE = /^([ \t]*)[-+*][ \t](\[[ xX]\][ \t])?/;
@@ -494,12 +495,18 @@ function emptyOrderedItemAt(state: EditorState, pos: number): ListItemLine | nul
   return entry;
 }
 
+// An ordered item's marker number. Null when `item` is missing or a bullet.
+function orderedNumberOf(state: EditorState, item: SyntaxNode | null): number | null {
+  const mark = item?.getChild("ListMark");
+  const match = mark ? ORDERED_MARK_RE.exec(state.doc.sliceString(mark.from, mark.to)) : null;
+  return match ? Number(match[1]) : null;
+}
+
 // The number of the item that follows `prev` at its level (`prev`'s number
 // + 1). Null when `prev` is missing or not an ordered item.
 function orderedNumberAfter(state: EditorState, prev: SyntaxNode | null): number | null {
-  const mark = prev?.getChild("ListMark");
-  const match = mark ? ORDERED_MARK_RE.exec(state.doc.sliceString(mark.from, mark.to)) : null;
-  return match ? Number(match[1]) + 1 : null;
+  const number = orderedNumberOf(state, prev);
+  return number === null ? null : number + 1;
 }
 
 // Rewrite an ordered item's marker number (keeping its delimiter) so a moved
@@ -518,6 +525,76 @@ function renumberOrderedMark(
   if (!match || Number(match[1]) === number) return null;
   return { from: mark.from, to: mark.to, insert: `${number}${match[2]}` };
 }
+
+const listDepth = (node: SyntaxNode): number => {
+  let depth = 0;
+  for (let p = node.parent; p; p = p.parent) if (p.name === "ListItem") depth++;
+  return depth;
+};
+
+// The ordered list at nesting `depth` around `pos`, so a list Tab just
+// created isn't matched to the outer list its item came from.
+function orderedListAt(state: EditorState, pos: number, depth: number): SyntaxNode | null {
+  for (let n: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1); n; n = n.parent) {
+    if (n.name === "OrderedList" && listDepth(n) === depth) return n;
+  }
+  return null;
+}
+
+// Only edits that add or remove rows renumber, so a number typed into a marker
+// stays. The start comes from before the edit (deleting `1.` leaves `1. 2.`);
+// all-same lists (`1. 1. 1.`) are a deliberate style and are left alone.
+const orderedListRenumber = EditorState.transactionFilter.of((tr) => {
+  if (!tr.docChanged) return tr;
+  if (!tr.isUserEvent("input") && !tr.isUserEvent("delete") && !tr.isUserEvent("move")) return tr;
+  const reindent = tr.isUserEvent("input.indent") || tr.isUserEvent("delete.outdent");
+  const startDoc = tr.startState.doc;
+  const ranges: [number, number][] = [];
+  tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+    const rowsChanged =
+      inserted.lines > 1 || startDoc.lineAt(fromA).number !== startDoc.lineAt(toA).number;
+    if (rowsChanged || reindent) ranges.push([fromB, toB]);
+  });
+  if (ranges.length === 0) return tr;
+
+  const state = tr.state;
+  const lists = new Map<number, SyntaxNode>();
+  for (const [from, to] of ranges) {
+    // Through the next row, so a list that row starts (the rows an outdented
+    // item now holds) is renumbered too.
+    const line = state.doc.lineAt(to);
+    const end = line.number < state.doc.lines ? state.doc.line(line.number + 1).to : line.to;
+    if (!syntaxTreeAvailable(state, end)) continue;
+    syntaxTree(state).iterate({
+      from: Math.max(0, from - 1),
+      to: end,
+      enter: (node) => {
+        if (node.name === "OrderedList") lists.set(node.from, node.node);
+      },
+    });
+  }
+
+  const changes: ChangeSpec[] = [];
+  for (const list of lists.values()) {
+    const items = list.getChildren("ListItem");
+    const numbers = items.map((item) => orderedNumberOf(state, item));
+    if (items.length > 1 && numbers.every((n) => n === numbers[0])) continue;
+    const before = orderedListAt(
+      tr.startState,
+      tr.changes.invertedDesc.mapPos(list.from, -1),
+      listDepth(list),
+    );
+    const start = (before && orderedNumberOf(tr.startState, before.firstChild)) ?? numbers[0];
+    if (start == null) continue;
+    items.forEach((item, i) => {
+      const mark = item.getChild("ListMark");
+      if (!mark || numbers[i] === null || numbers[i] === start + i) return;
+      changes.push({ from: mark.from, to: mark.to - 1, insert: String(start + i) });
+    });
+  }
+  if (changes.length === 0) return tr;
+  return [tr, { changes, sequential: true }];
+});
 
 function clampCollapsedListPrefixRange(state: EditorState, range: SelectionRange): SelectionRange {
   if (!range.empty) return range;
@@ -1052,6 +1129,7 @@ const checkboxClickHandler = EditorView.domEventHandlers(
 export const listExtension: Extension = [
   listDecorationsField,
   listPrefixSelectionGuard,
+  orderedListRenumber,
   listPrefixMouseHandler,
   listPrefixArrowKeymap,
   // `Prec.highest` wins over `@codemirror/lang-markdown`'s `Prec.high`

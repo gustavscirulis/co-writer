@@ -2,6 +2,8 @@
 
 ## 2026-11-05
 
+- Numbered lists now stay in order when you delete, cut, paste or indent a row. The numbers after it update, and one undo brings back the original.
+
 - After Co-writer edits a note, the words it added get a faint green tint so you can spot them. A phrase's tint clears when you edit it, and Co-writer's next turn replaces them all. Removed text isn't marked.
 
 - When Co-writer adds a list item, the tint no longer spills onto the bullet of the item after it, and that bullet stays in line with the others.

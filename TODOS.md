@@ -19,6 +19,8 @@
 
 ## Done
 
+- Numbered lists going out of order after deleting a row: [`SPECs/ordered-list-renumber-spec.md`](SPECs/ordered-list-renumber-spec.md). `orderedListRenumber` renumbers the ordered lists a row-adding or row-removing user edit touches (delete, cut, paste, Tab / Shift-Tab), in the same transaction so one undo restores the text. Keeps the list's start, the delimiter, all-same lists (`1. 1. 1.`) and hand-typed numbers. Unit tests cover each rule; checked in the playground (`?full`): delete a selected row, delete the first row, cut and paste, Tab / Shift-Tab, undo, typing a number into a marker.
+
 - Co-writer highlight in tables and embeds: marks can't reach inside block widgets. Tables now tint the new words in each cell (`agentAddedRanges` + `addedCellText`); every other block widget gets a whole-block wash from one layer in `agent-edit-highlight.ts`, sharing geometry with the ⌥-hover layer (`block-rect.ts`). The word diff no longer merges across a new line or marks pipe-only runs. Unit tests cover the cell mapping and the widget ranges; checked in the playground (`?full`, light mode): new row, new cell words, new table, Mermaid, HTML block, embed and image, and typing in a tinted cell clears it. Not yet tried with a real Co-writer turn in the native app.
 
 - Co-writer highlight spilling onto the next bullet: a new list item diffed as `Item.\n- `, so the mark ended on the following item's `-` and pushed that bullet out of line. `insertedWordRanges` now emits one range per line and drops each line's block marker (task checkboxes included). Unit tests cover single, multiple, nested and task items; checked in the playground (`?full`).
