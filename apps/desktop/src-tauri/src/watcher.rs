@@ -376,8 +376,65 @@ fn publish_prepared_index_for_snapshot(
     }
 }
 
-/// Self-writes skip the reload echo but must still join the index, or a
-/// folder holding only a just-renamed note reads as Markdown-free and hides.
+/// Writer's own renames move their index entries before the watcher sees
+/// them; otherwise a sidebar refresh between the old path leaving and the new
+/// one arriving reads the parent folder as Markdown-free and hides it.
+pub fn rename_in_index(state: &WorkspaceState, from: &Path, to: &Path) {
+    let Some((root, epoch)) = state.workspace_snapshot() else {
+        return;
+    };
+    publish_prepared_index_for_snapshot(state, &root, epoch, || {
+        prepare_index_rename(state, &root, from, to)
+    });
+}
+
+fn prepare_index_rename(
+    state: &WorkspaceState,
+    root: &Path,
+    from: &Path,
+    to: &Path,
+) -> PreparedIndexUpdate {
+    let revision = state.file_index_revision.load(Ordering::SeqCst);
+    let mut index = state.file_index.read().clone();
+    let mut changed = false;
+    index.retain_mut(|file| {
+        let Ok(rest) = file.path.strip_prefix(from) else {
+            return true;
+        };
+        changed = true;
+        let path = if rest.as_os_str().is_empty() {
+            to.to_path_buf()
+        } else {
+            to.join(rest)
+        };
+        let Ok(relative) = path.strip_prefix(root) else {
+            return false;
+        };
+        if path.extension().and_then(|e| e.to_str()) != Some("md")
+            || should_ignore(&path, root)
+            || is_workspace_ignored(state, &path, false)
+        {
+            return false;
+        }
+        file.relative_path = relative.to_string_lossy().into_owned();
+        file.name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        file.path = path;
+        true
+    });
+    let dirs = state::rebuild_dirs_from_index(&index, root);
+    PreparedIndexUpdate {
+        revision,
+        index,
+        dirs,
+        changed,
+    }
+}
+
+/// Self-writes skip the reload echo but must still join the index, e.g. a
+/// new note saved before the watcher has seen it created.
 fn index_self_written_markdown(
     state: &WorkspaceState,
     root: &Path,
@@ -1053,10 +1110,79 @@ mod tests {
     }
 
     #[test]
+    fn renaming_the_only_note_in_a_folder_keeps_the_folder_in_the_sidebar() {
+        // Regression: the watcher pruned the old name before indexing the new
+        // one, so a sidebar refresh in between hid the folder for a moment.
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        let folder = root.join("Untitled Folder");
+        std::fs::create_dir(&folder).unwrap();
+        let old = folder.join("Untitled.md");
+        let new = folder.join("Ideas.md");
+        std::fs::write(&new, "# Ideas\n\n").unwrap();
+
+        let state = WorkspaceState::default();
+        state.replace_workspace_root(root.clone());
+        state.index_ready.store(true, Ordering::Relaxed);
+        add_to_index(&state, &old, &root);
+
+        rename_in_index(&state, &old, &new);
+        let prepared = prepare_index_removal(&state, &root, |file| file.path == old);
+        assert!(
+            !prepared.changed,
+            "the watcher's prune of the old name is a no-op"
+        );
+
+        let index = state.file_index.read().clone();
+        assert_eq!(index.len(), 1);
+        assert_eq!(index[0].path, new);
+        assert_eq!(index[0].relative_path, "Untitled Folder/Ideas.md");
+        assert_eq!(index[0].name, "Ideas.md");
+        let entries =
+            crate::commands::fs::read_directory_impl(&root.to_string_lossy(), Some(&state))
+                .unwrap();
+        assert!(entries
+            .iter()
+            .any(|entry| entry.path == folder.to_string_lossy()));
+    }
+
+    #[test]
+    fn renaming_a_folder_moves_its_descendants_and_drops_hidden_targets() {
+        let state = WorkspaceState::default();
+        let root = PathBuf::from("/ws");
+        state.replace_workspace_root(root.clone());
+        add_to_index(&state, &root.join("drafts/a.md"), &root);
+        add_to_index(&state, &root.join("drafts/deep/b.md"), &root);
+        add_to_index(&state, &root.join("drafts-old/c.md"), &root);
+        add_to_index(&state, &root.join("note.md"), &root);
+
+        rename_in_index(&state, &root.join("drafts"), &root.join("essays"));
+        rename_in_index(&state, &root.join("note.md"), &root.join(".note.md"));
+
+        let mut paths: Vec<_> = state
+            .file_index
+            .read()
+            .iter()
+            .map(|f| f.path.clone())
+            .collect();
+        paths.sort();
+        assert_eq!(
+            paths,
+            vec![
+                root.join("drafts-old/c.md"),
+                root.join("essays/a.md"),
+                root.join("essays/deep/b.md"),
+            ]
+        );
+        let dirs = state.dirs_with_markdown.read();
+        assert!(dirs.contains(&root.join("essays/deep")));
+        assert!(!dirs.contains(&root.join("drafts")));
+    }
+
+    #[test]
     fn self_written_note_in_new_folder_keeps_the_folder_in_the_sidebar() {
-        // Regression: renaming a new note writes its heading, so the watcher
-        // saw the new path only as a self-write and never indexed it. The
-        // folder then read as Markdown-free and vanished from the sidebar.
+        // Regression: a note saved before the watcher saw it created only
+        // arrived as a self-write, was never indexed, and hid its folder.
         let dir = tempfile::TempDir::new().unwrap();
         let root = dir.path().canonicalize().unwrap();
         let folder = root.join("Untitled Folder");
