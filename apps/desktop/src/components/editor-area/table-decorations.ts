@@ -24,6 +24,7 @@ import { prosemarkMarkdownSyntaxExtensions } from "@/lib/prosemark-core/main";
 import { SETTINGS_SCHEMA } from "@/lib/settings-schema";
 import { textDiff } from "@/lib/text-diff";
 import { parseWikiLink } from "@/lib/wiki-links";
+import { agentAddedRanges } from "./agent-edit-highlight";
 import {
   buildTableCellMenuItemsSpec,
   showNativeContextMenu,
@@ -528,6 +529,53 @@ function rawOffsetForRendered(cell: HTMLElement, rendered: number): number {
   return offset;
 }
 
+/**
+ * `ranges` of the cell's markdown as ranges of its rendered text, skipping the
+ * syntax `setCellRawContent` shows as marks.
+ */
+export function addedCellText(markdown: string, ranges: { from: number; to: number }[]) {
+  const hidden: [number, number][] = [];
+  const walk = (node: SyntaxNode, inLink: boolean) => {
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      if (child.name === "Escape") hidden.push([child.from, child.from + 1]);
+      else if (rawMarkNodes.has(child.name) || (inLink && child.name === "URL")) {
+        hidden.push([child.from, child.to]);
+      } else walk(child, inLink || child.name === "Link");
+    }
+  };
+  walk(tableCellMarkdownParser.parse(markdown).topNode, false);
+  const rendered = (pos: number) =>
+    hidden.reduce((at, [from, to]) => at - Math.max(0, Math.min(to, pos) - from), pos);
+  return ranges
+    .map((range) => ({ from: rendered(range.from), to: rendered(range.to) }))
+    .filter((range) => range.to > range.from);
+}
+
+function tintRenderedText(cell: HTMLElement, ranges: { from: number; to: number }[]) {
+  if (ranges.length === 0) return;
+  const nodes: globalThis.Text[] = [];
+  const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    nodes.push(node as globalThis.Text);
+  }
+  let start = 0;
+  for (const node of nodes) {
+    const end = start + node.length;
+    const local = ranges
+      .filter((range) => range.from < end && range.to > start)
+      .map((range) => [Math.max(range.from, start) - start, Math.min(range.to, end) - start]);
+    start = end;
+    for (const [from, to] of local.reverse()) {
+      node.splitText(to);
+      const piece = node.splitText(from);
+      const span = document.createElement("span");
+      span.className = "writer-agent-new";
+      piece.replaceWith(span);
+      span.append(piece);
+    }
+  }
+}
+
 function caretFromPoint(x: number, y: number): { node: Node; offset: number } | null {
   const position = document.caretPositionFromPoint?.(x, y);
   if (position) return { node: position.offsetNode, offset: position.offset };
@@ -638,6 +686,8 @@ class TableEditor {
   private cellRanges: TableCellRanges = [];
   private baseline: string | null = null;
   private diff: TableDiff | null = null;
+  private added: TableWidget["added"] = [];
+  private addedKey = "";
   private cells: HTMLElement[][] = [];
   private active: ActiveCell | null = null;
 
@@ -672,9 +722,22 @@ class TableEditor {
       widget.writable === this.editable &&
       widget.baseline === this.baseline
     ) {
+      if (widget.addedKey !== this.addedKey) this.retint(widget);
       return;
     }
     this.paint(widget);
+  }
+
+  /** Typing in a cell shifts or clears highlights; repaint only the other cells' text. */
+  private retint({ added, addedKey }: Pick<TableWidget, "added" | "addedKey">) {
+    this.added = added;
+    this.addedKey = addedKey;
+    if (this.diff) return;
+    this.cells.forEach((row, r) =>
+      row.forEach((cell, c) => {
+        if (cell !== this.active?.cell) this.renderCell(cell, r, c);
+      }),
+    );
   }
 
   destroy() {
@@ -725,13 +788,17 @@ class TableEditor {
     writable: editable,
     baseline,
     diff,
-  }: Pick<TableWidget, "raw" | "table" | "writable" | "baseline" | "diff">) {
+    added,
+    addedKey,
+  }: Pick<TableWidget, "raw" | "table" | "writable" | "baseline" | "diff" | "added" | "addedKey">) {
     const hadFocus = this.dom.contains(document.activeElement);
     this.raw = raw;
     this.model = table.model;
     this.cellRanges = table.cells;
     this.baseline = baseline;
     this.diff = diff;
+    this.added = added;
+    this.addedKey = addedKey;
     this.editable = editable;
     this.active = null;
     this.dom.classList.toggle("cm-table-editable", editable);
@@ -745,12 +812,12 @@ class TableEditor {
       const aligns = tableAligns(table.model);
       this.cells = table.model.rows.map((row, r) => {
         const tr = (r === 0 ? thead : tbody).appendChild(document.createElement("tr"));
-        return row.cells.map((markdown, c) => {
+        return row.cells.map((_, c) => {
           const cell = tr.appendChild(document.createElement(r === 0 ? "th" : "td"));
           cell.dataset.row = String(r);
           cell.dataset.column = String(c);
           if (aligns[c]) cell.style.textAlign = aligns[c];
-          setCellMarkdownContent(cell, markdown);
+          this.renderCell(cell, r, c);
           return cell;
         });
       });
@@ -801,7 +868,21 @@ class TableEditor {
     this.active = null;
     active.cell.classList.remove("cm-table-cell-active");
     active.cell.removeAttribute("contenteditable");
-    setCellMarkdownContent(active.cell, this.model.rows[active.r].cells[active.c]);
+    this.renderCell(active.cell, active.r, active.c);
+  }
+
+  private renderCell(cell: HTMLElement, r: number, c: number) {
+    const markdown = this.model.rows[r].cells[c];
+    setCellMarkdownContent(cell, markdown);
+    const range = this.cellRanges[r]?.[c];
+    if (!range || this.added.length === 0) return;
+    const inCell = this.added
+      .filter((added) => added.from < range.to && added.to > range.from)
+      .map((added) => ({
+        from: Math.max(added.from, range.from) - range.from,
+        to: Math.min(added.to, range.to) - range.from,
+      }));
+    tintRenderedText(cell, addedCellText(markdown, inCell));
   }
 
   /** Mirrors the cell caret into the document selection, so undo returns to it. */
@@ -853,8 +934,8 @@ class TableEditor {
   private reset(raw: string) {
     const table = parseMarkdownTable(raw);
     if (table) {
-      const { editable: writable, baseline, diff } = this;
-      this.paint({ raw, table, writable, baseline, diff });
+      const { editable: writable, baseline, diff, added, addedKey } = this;
+      this.paint({ raw, table, writable, baseline, diff, added, addedKey });
     }
   }
 
@@ -1091,19 +1172,27 @@ class TableEditor {
 }
 
 class TableWidget extends WidgetType {
+  readonly showsAgentEdits = true;
+  readonly addedKey: string;
+
   constructor(
     readonly raw: string,
     readonly table: ParsedTable,
     readonly writable: boolean,
     readonly baseline: string | null,
     readonly diff: TableDiff | null,
+    readonly added: { from: number; to: number }[],
   ) {
     super();
+    this.addedKey = added.map((range) => `${range.from}-${range.to}`).join(",");
   }
 
   eq(other: TableWidget): boolean {
     return (
-      other.raw === this.raw && other.writable === this.writable && other.baseline === this.baseline
+      other.raw === this.raw &&
+      other.writable === this.writable &&
+      other.baseline === this.baseline &&
+      other.addedKey === this.addedKey
     );
   }
 
@@ -1180,7 +1269,14 @@ function buildTableDecorations(state: EditorState): DecorationSet {
         : diffTables(parseMarkdownTable(baseline)?.model ?? null, parsed.model);
     ranges.push(
       Decoration.replace({
-        widget: new TableWidget(raw, parsed, editable, baseline, diff),
+        widget: new TableWidget(
+          raw,
+          parsed,
+          editable,
+          baseline,
+          diff,
+          agentAddedRanges(state, from, to),
+        ),
         block: true,
       }).range(from, to),
     );

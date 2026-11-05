@@ -2,9 +2,12 @@ import { describe, expect, test } from "vite-plus/test";
 import { EditorSelection, EditorState, type Extension } from "@codemirror/state";
 import { markdown } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree } from "@codemirror/language";
-import { EditorView } from "@codemirror/view";
+import { EditorView, type DecorationSet } from "@codemirror/view";
 import { GFM } from "@lezer/markdown";
+import { agentEditHighlight } from "../src/components/editor-area/agent-edit-highlight";
+import { agentReloadTransaction } from "../src/components/editor-area/agent-editing";
 import {
+  addedCellText,
   diffCellMarkdown,
   parseTableCellInlineMarkdown,
   tableDecorations,
@@ -209,5 +212,47 @@ describe("diffCellMarkdown", () => {
 
   test("shows a cleared cell as struck-through text", () => {
     expect(diffCellMarkdown("gone", "")).toEqual([removed("gone")]);
+  });
+});
+
+describe("Co-writer highlights in tables", () => {
+  const agentTables = (content: string, next: string) => {
+    const state = makeState(0, content, [agentEditHighlight]);
+    const changed = state.update(agentReloadTransaction(content, next, null, "t1")).state;
+    ensureSyntaxTree(changed, changed.doc.length, 1000);
+    return changed;
+  };
+  const added = (state: EditorState) => {
+    const [table] = collectTables(state);
+    const widget = (
+      state.facet(EditorView.decorations).find((source) => typeof source !== "function") as
+        | DecorationSet
+        | undefined
+    )?.iter(table.from).value?.spec.widget as {
+      raw: string;
+      added: { from: number; to: number }[];
+    };
+    return widget.added.map((range) => widget.raw.slice(range.from, range.to));
+  };
+
+  test("a new row and a new word reach the table widget", () => {
+    const next = doc.replace("| Tea |", "| Green tea |").replace(after, `\n| Coffee | 3 |${after}`);
+    expect(added(agentTables(doc, next))).toEqual(["Green tea", "| Coffee | 3"]);
+  });
+
+  test("editing a highlighted cell clears its words", () => {
+    const next = doc.replace("| Tea |", "| Green tea |");
+    const state = agentTables(doc, next);
+    const at = next.indexOf("Green");
+    expect(added(state.update({ changes: { from: at, insert: "x" } }).state)).toEqual([]);
+  });
+
+  test("source ranges map onto the cell's rendered text", () => {
+    expect(addedCellText("Green tea", [{ from: 0, to: 5 }])).toEqual([{ from: 0, to: 5 }]);
+    expect(addedCellText("**Green** tea", [{ from: 0, to: 13 }])).toEqual([{ from: 0, to: 9 }]);
+    expect(addedCellText("[Green](https://x.test) tea", [{ from: 24, to: 27 }])).toEqual([
+      { from: 6, to: 9 },
+    ]);
+    expect(addedCellText("a \\| b", [{ from: 4, to: 6 }])).toEqual([{ from: 3, to: 5 }]);
   });
 });

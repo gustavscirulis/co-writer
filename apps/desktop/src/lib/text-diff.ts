@@ -16,7 +16,7 @@ export function textDiff(before: string, after: string) {
 const WORD_CHAR = /[\p{L}\p{N}_]/u;
 const WORD = /[\p{L}\p{N}_]+/gu;
 const TOKEN = /[\p{L}\p{N}_]+[^\S\n]*|[^\p{L}\p{N}_\s][^\S\n]*|\s+/gu;
-const BLOCK_MARKER = /^(#{1,6} |[-*+] |\d+[.)] |> )/;
+const BLOCK_MARKER = /^[^\S\n]*(#{1,6} |[-*+] (\[[ xX]\] )?|\d+[.)] |> )?/;
 const MAX_LCS_CELLS = 4_000_000;
 
 type Change = { fromA: number; toA: number; fromB: number; toB: number };
@@ -70,12 +70,12 @@ function wordDiff(before: string, after: string): Change[] | null {
       toB: B.offsets[j],
     });
   }
-  return mergeShortEqualities(before, changes);
+  return mergeShortEqualities(before, after, changes);
 }
 
 /** Folds a kept run no longer than the changes on both sides into them, within
  *  one line, so shared filler words don't break a rewrite into fragments. */
-function mergeShortEqualities(before: string, changes: Change[]) {
+function mergeShortEqualities(before: string, after: string, changes: Change[]) {
   const size = (c: Change) => Math.max(c.toA - c.fromA, c.toB - c.fromB);
   let merged = true;
   while (merged) {
@@ -88,7 +88,8 @@ function mergeShortEqualities(before: string, changes: Change[]) {
         last &&
         gap <= size(last) &&
         gap <= size(change) &&
-        !before.slice(last.toA, change.fromA).includes("\n")
+        !before.slice(last.fromA, change.toA).includes("\n") &&
+        !after.slice(last.fromB, change.toB).includes("\n")
       ) {
         next[next.length - 1] = { ...last, toA: change.toA, toB: change.toB };
         merged = true;
@@ -112,11 +113,24 @@ function slideToLineBoundary(text: string, from: number, to: number) {
   return atBoundary(f) ? [f, t] : [from, to];
 }
 
-/** Ranges of `after` holding words that `before` lacks, whole words only.
- *  Runs split by one kept word are joined, so a rewrite reads as one phrase. */
+/** Ranges of `after` holding words that `before` lacks, whole words only, one per line
+ *  and never over a block marker. Runs split by one kept word are joined, so a rewrite
+ *  reads as one phrase. */
 export function insertedWordRanges(before: string, after: string) {
   const isWord = (i: number) => WORD_CHAR.test(after[i] ?? "");
   const ranges: { from: number; to: number }[] = [];
+  const push = (from: number, to: number) => {
+    const lineStart = after.lastIndexOf("\n", from - 1) + 1;
+    from = Math.max(from, lineStart + after.slice(lineStart, to).match(BLOCK_MARKER)![0].length);
+    while (from < to && /\s/.test(after[from])) from++;
+    while (to > from && /\s/.test(after[to - 1])) to--;
+    if (!WORD_CHAR.test(after.slice(from, to))) return;
+    const last = ranges[ranges.length - 1];
+    const gap = last ? after.slice(last.to, from) : "";
+    if (last && !gap.includes("\n") && (gap.match(WORD) ?? []).length <= 1) {
+      last.to = Math.max(last.to, to);
+    } else ranges.push({ from, to });
+  };
   for (const change of wordDiff(before, after) ?? presentableDiff(before, after, { timeout: 50 })) {
     if (change.fromB === change.toB) continue;
     let [from, to] =
@@ -125,15 +139,12 @@ export function insertedWordRanges(before: string, after: string) {
         : [change.fromB, change.toB];
     while (from > 0 && isWord(from - 1) && isWord(from)) from--;
     while (to < after.length && isWord(to - 1) && isWord(to)) to++;
-    while (from < to && /\s/.test(after[from])) from++;
-    from += after.slice(from, to).match(BLOCK_MARKER)?.[0].length ?? 0;
-    while (to > from && /\s/.test(after[to - 1])) to--;
-    if (from >= to) continue;
-    const last = ranges[ranges.length - 1];
-    const gap = last ? after.slice(last.to, from) : "";
-    if (last && !gap.includes("\n") && (gap.match(WORD) ?? []).length <= 1) {
-      last.to = Math.max(last.to, to);
-    } else ranges.push({ from, to });
+    while (from < to) {
+      const newline = after.indexOf("\n", from);
+      const lineEnd = newline === -1 || newline > to ? to : newline;
+      push(from, lineEnd);
+      from = lineEnd + 1;
+    }
   }
   return ranges;
 }

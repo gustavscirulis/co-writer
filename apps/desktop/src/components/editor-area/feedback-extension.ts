@@ -1,7 +1,6 @@
 import {
   Decoration,
   EditorView,
-  RectangleMarker,
   ViewPlugin,
   keymap,
   layer,
@@ -27,6 +26,7 @@ import {
   feedbackTargets,
   type FeedbackAnchor,
 } from "@/lib/feedback-anchors";
+import { blockRect } from "./block-rect";
 import "./feedback-extension.css";
 
 const WIDGETS =
@@ -130,25 +130,8 @@ const altHoverLayer = layer({
   markers(view) {
     const target = view.state.field(altHoverField);
     if (!target || target.to > view.state.doc.length) return [];
-    const scroller = view.scrollDOM.getBoundingClientRect();
-    const content = view.contentDOM.getBoundingClientRect();
-    const style = getComputedStyle(view.contentDOM);
-    const baseLeft = scroller.left - view.scrollDOM.scrollLeft * view.scaleX;
-    const baseTop = scroller.top - view.scrollDOM.scrollTop * view.scaleY;
-    const left = (content.left - baseLeft) / view.scaleX + parseFloat(style.paddingLeft);
-    const right = (content.right - baseLeft) / view.scaleX - parseFloat(style.paddingRight);
-    const offset = (view.documentTop - baseTop) / view.scaleY;
-    const top = view.lineBlockAt(target.from).top + offset;
-    const bottom = view.lineBlockAt(target.to).bottom + offset;
-    return [
-      new RectangleMarker(
-        "writer-block-hover",
-        left - 8,
-        top - 2,
-        right - left + 16,
-        bottom - top + 4,
-      ),
-    ];
+    const top = view.lineBlockAt(target.from).top;
+    return [blockRect(view, "writer-block-hover", top, view.lineBlockAt(target.to).bottom)];
   },
   update: (update) =>
     update.docChanged ||

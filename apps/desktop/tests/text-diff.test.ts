@@ -61,6 +61,17 @@ for (const [name, before, after] of [
   });
 }
 
+for (const [name, after, expected] of [
+  ["one", "- First.\n- New item.\n- Last.\n", ["New item."]],
+  ["two", "- First.\n- New one.\n- New two.\n- Last.\n", ["New one.", "New two."]],
+  ["indented", "- First.\n  - New item.\n- Last.\n", ["New item."]],
+  ["task", "- First.\n- [ ] New task.\n- Last.\n", ["New task."]],
+] as const) {
+  test(`inserted list items leave every list marker out: ${name}`, () => {
+    expect(inserted("- First.\n- Last.\n", after)).toEqual(expected);
+  });
+}
+
 test("inserted word ranges fall back to a character diff for very large rewrites", () => {
   const before = "old ".repeat(2500).trim();
   const after = "new ".repeat(2500).trim();

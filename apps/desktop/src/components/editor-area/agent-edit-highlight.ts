@@ -1,11 +1,16 @@
-import { StateEffect, StateField, type Extension } from "@codemirror/state";
+import { StateEffect, StateField, type EditorState, type Extension } from "@codemirror/state";
 import {
+  BlockType,
   Decoration,
   EditorView,
   ViewPlugin,
+  layer,
+  type BlockInfo,
   type DecorationSet,
+  type LayerMarker,
   type ViewUpdate,
 } from "@codemirror/view";
+import { blockRect } from "./block-rect";
 import "./agent-edit-highlight.css";
 
 export const showAgentEdit = StateEffect.define<{
@@ -48,6 +53,50 @@ export const agentEditHighlightField = StateField.define<{
   provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
 });
 
+/** Highlighted ranges overlapping `from`–`to`, relative to `from`, for widgets that draw their own text. */
+export function agentAddedRanges(state: EditorState, from: number, to: number) {
+  const ranges: { from: number; to: number }[] = [];
+  state.field(agentEditHighlightField, false)?.decorations.between(from, to, (a, b) => {
+    if (b > from && a < to)
+      ranges.push({ from: Math.max(a, from) - from, to: Math.min(b, to) - from });
+  });
+  return ranges;
+}
+
+const widgetBlockAt = (view: EditorView, pos: number): BlockInfo | null => {
+  const line = view.lineBlockAt(pos);
+  const blocks = Array.isArray(line.type) ? line.type : [line];
+  return (
+    blocks.find((b) => b.type === BlockType.WidgetRange && b.from <= pos && pos < b.to) ?? null
+  );
+};
+
+// Marks can't reach into a block widget, so it's tinted whole unless it sets `showsAgentEdits`.
+const blockLayer = layer({
+  above: false,
+  class: "writer-agent-new-block-layer",
+  markers(view) {
+    const { decorations } = view.state.field(agentEditHighlightField);
+    const markers: LayerMarker[] = [];
+    let last = -1;
+    decorations.between(view.viewport.from, view.viewport.to, (pos) => {
+      const block = pos > last ? widgetBlockAt(view, pos) : null;
+      if (!block || (block.widget as { showsAgentEdits?: boolean } | null)?.showsAgentEdits) {
+        return;
+      }
+      last = block.to;
+      markers.push(blockRect(view, "writer-agent-new-block", block.top, block.bottom));
+    });
+    return markers;
+  },
+  update: (update) =>
+    update.docChanged ||
+    update.geometryChanged ||
+    update.viewportChanged ||
+    update.state.field(agentEditHighlightField) !==
+      update.startState.field(agentEditHighlightField),
+});
+
 const freshPulse = ViewPlugin.fromClass(
   class {
     timer = 0;
@@ -67,4 +116,4 @@ const freshPulse = ViewPlugin.fromClass(
   },
 );
 
-export const agentEditHighlight: Extension = [agentEditHighlightField, freshPulse];
+export const agentEditHighlight: Extension = [agentEditHighlightField, freshPulse, blockLayer];
