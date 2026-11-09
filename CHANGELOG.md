@@ -4,6 +4,8 @@
 
 - After a Co-writer edit, the footer now says how many words it added and removed, with a Clear button that fades the green tint away. Pressing Esc in the note does the same. Undoing a Co-writer edit now removes its tint and summary, redo brings them back, and restoring an older version clears them.
 
+- A note you create from the sidebar's New File now opens as soon as you name it, with its title filled in and the caret ready on the line below.
+
 ## 2026-11-05
 
 - Numbered lists now stay in order when you delete, cut, paste or indent a row. The numbers after it update, and one undo brings back the original.

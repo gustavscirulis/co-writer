@@ -24,7 +24,7 @@ import * as tauri from "@/lib/tauri";
 import { getFileStem, getParentDir, getRelativePath } from "@/lib/paths";
 import { duplicateFile } from "./duplicate-file";
 import { useMoveEntry } from "./use-move-entry";
-import { FileTree } from "./file-tree";
+import { FileTree, type RenameTarget } from "./file-tree";
 import { FileTreeNode } from "./file-tree-node";
 import { showFileContextMenu } from "./file-context-menu";
 import { ShowMoreButton, SidebarSection } from "./sidebar-section";
@@ -35,8 +35,8 @@ interface SidebarNavigatorProps {
   enableContextMenus?: boolean;
   onOpenFileComplete?: () => void;
   className?: string;
-  renamingPath: string | null;
-  onRenamingPathChange: (path: string | null) => void;
+  renaming: RenameTarget | null;
+  onRenamingChange: (target: RenameTarget | null) => void;
   everythingCollapsed: boolean;
   onEverythingCollapsedChange: (collapsed: boolean) => void;
 }
@@ -52,8 +52,8 @@ export function SidebarNavigator({
   enableContextMenus = true,
   onOpenFileComplete,
   className = "flex flex-col gap-4 py-2",
-  renamingPath,
-  onRenamingPathChange,
+  renaming,
+  onRenamingChange,
   everythingCollapsed,
   onEverythingCollapsedChange,
 }: SidebarNavigatorProps) {
@@ -264,8 +264,8 @@ export function SidebarNavigator({
           rootPath={root}
           openFile={openFileAndComplete}
           enableContextMenus={enableContextMenus}
-          renamingPath={renamingPath}
-          onRenamingPathChange={onRenamingPathChange}
+          renaming={renaming}
+          onRenamingChange={onRenamingChange}
         />
       </SidebarSection>
     </div>
