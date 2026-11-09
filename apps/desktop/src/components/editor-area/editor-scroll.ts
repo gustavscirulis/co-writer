@@ -21,11 +21,12 @@ export function scrollPosToSafeTop(
   scroller: HTMLElement,
   pos: number,
   behavior: ScrollBehavior,
+  margin = EDITOR_SAFE_SCROLL_MARGIN,
 ) {
   const block = view.lineBlockAt(Math.min(pos, view.state.doc.length));
   const screenY = view.documentTop + block.top;
   const scrollerRect = scroller.getBoundingClientRect();
-  const delta = screenY - scrollerRect.top - EDITOR_SAFE_SCROLL_MARGIN;
+  const delta = screenY - scrollerRect.top - margin;
   const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
   const next = Math.max(0, Math.min(scroller.scrollTop + delta, max));
   scroller.scrollTo({ top: next, behavior });
