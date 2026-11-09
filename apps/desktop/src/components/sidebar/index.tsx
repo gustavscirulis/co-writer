@@ -34,8 +34,8 @@ function SidebarSurface() {
         />
         <div data-sidebar-surface-content className="min-h-0 flex-1 overflow-hidden">
           <FileBrowser
-            renamingPath={surface.tree.renamingPath}
-            onRenamingPathChange={surface.tree.onRenamingPathChange}
+            renaming={surface.tree.renaming}
+            onRenamingChange={surface.tree.onRenamingChange}
             everythingCollapsed={surface.tree.everythingCollapsed}
             onEverythingCollapsedChange={surface.tree.onEverythingCollapsedChange}
           />

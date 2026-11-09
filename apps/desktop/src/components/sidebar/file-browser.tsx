@@ -4,17 +4,18 @@ import { useOpenCommandPalette } from "@/hooks/use-command-palette";
 import { useBooleanSetting } from "@/hooks/use-settings";
 import { ScrollFade } from "@/components/scroll-fade";
 import { SidebarNavigator } from "./sidebar-navigator";
+import type { RenameTarget } from "./file-tree";
 
 interface FileBrowserProps {
-  renamingPath: string | null;
-  onRenamingPathChange: (path: string | null) => void;
+  renaming: RenameTarget | null;
+  onRenamingChange: (target: RenameTarget | null) => void;
   everythingCollapsed: boolean;
   onEverythingCollapsedChange: (collapsed: boolean) => void;
 }
 
 export function FileBrowser({
-  renamingPath,
-  onRenamingPathChange,
+  renaming,
+  onRenamingChange,
   everythingCollapsed,
   onEverythingCollapsedChange,
 }: FileBrowserProps) {
@@ -53,8 +54,8 @@ export function FileBrowser({
 
       <ScrollFade className="min-h-0 flex-1 overflow-y-scroll scrollbar-none">
         <SidebarNavigator
-          renamingPath={renamingPath}
-          onRenamingPathChange={onRenamingPathChange}
+          renaming={renaming}
+          onRenamingChange={onRenamingChange}
           everythingCollapsed={everythingCollapsed}
           onEverythingCollapsedChange={onEverythingCollapsedChange}
         />
