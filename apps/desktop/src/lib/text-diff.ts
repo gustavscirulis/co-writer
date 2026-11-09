@@ -32,7 +32,7 @@ function tokenize(text: string, from: number, to: number) {
 /** Word-level LCS over the region `textDiff` says changed, or null when it is too
  *  large. `presentableDiff` is character-level and its heuristics can splice an
  *  unrelated new sentence into the deleted one. */
-function wordDiff(before: string, after: string): Change[] | null {
+function lcsWordChanges(before: string, after: string): Change[] | null {
   const outer = textDiff(before, after);
   const A = tokenize(before, outer.from, outer.to);
   const B = tokenize(after, outer.from, outer.from + outer.insert.length);
@@ -70,7 +70,7 @@ function wordDiff(before: string, after: string): Change[] | null {
       toB: B.offsets[j],
     });
   }
-  return mergeShortEqualities(before, after, changes);
+  return changes;
 }
 
 /** Folds a kept run no longer than the changes on both sides into them, within
@@ -113,10 +113,7 @@ function slideToLineBoundary(text: string, from: number, to: number) {
   return atBoundary(f) ? [f, t] : [from, to];
 }
 
-/** Ranges of `after` holding words that `before` lacks, whole words only, one per line
- *  and never over a block marker. Runs split by one kept word are joined, so a rewrite
- *  reads as one phrase. */
-export function insertedWordRanges(before: string, after: string) {
+function insertedRanges(after: string, changes: readonly Change[]) {
   const isWord = (i: number) => WORD_CHAR.test(after[i] ?? "");
   const ranges: { from: number; to: number }[] = [];
   const push = (from: number, to: number) => {
@@ -131,7 +128,7 @@ export function insertedWordRanges(before: string, after: string) {
       last.to = Math.max(last.to, to);
     } else ranges.push({ from, to });
   };
-  for (const change of wordDiff(before, after) ?? presentableDiff(before, after, { timeout: 50 })) {
+  for (const change of changes) {
     if (change.fromB === change.toB) continue;
     let [from, to] =
       change.fromA === change.toA
@@ -147,4 +144,28 @@ export function insertedWordRanges(before: string, after: string) {
     }
   }
   return ranges;
+}
+
+const countWords = (text: string) => text.match(WORD)?.length ?? 0;
+
+/** What a Co-writer edit changed: the ranges of `after` to highlight, plus how many
+ *  words it added and removed. Ranges are whole words only, one per line and never
+ *  over a block marker; runs split by one kept word are joined, so a rewrite reads
+ *  as one phrase. Counts come from the unmerged diff, so kept filler isn't counted. */
+export function agentEditDiff(before: string, after: string) {
+  const raw = lcsWordChanges(before, after);
+  const changes = raw
+    ? mergeShortEqualities(before, after, raw)
+    : presentableDiff(before, after, { timeout: 50 });
+  let added = 0;
+  let removed = 0;
+  for (const c of raw ?? changes) {
+    added += countWords(after.slice(c.fromB, c.toB));
+    removed += countWords(before.slice(c.fromA, c.toA));
+  }
+  return { ranges: insertedRanges(after, changes), added, removed };
+}
+
+export function insertedWordRanges(before: string, after: string) {
+  return agentEditDiff(before, after).ranges;
 }

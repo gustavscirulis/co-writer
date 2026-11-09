@@ -8,7 +8,7 @@ import {
 } from "@codemirror/state";
 import { invertedEffects, isolateHistory } from "@codemirror/commands";
 import { isAgentEditing, subscribeAgentEditing } from "@/lib/agent-turn";
-import { insertedWordRanges, textDiff } from "@/lib/text-diff";
+import { agentEditDiff, textDiff } from "@/lib/text-diff";
 import { agentEditHighlight, showAgentEdit } from "./agent-edit-highlight";
 import { EditorView } from "@codemirror/view";
 
@@ -65,7 +65,7 @@ export function agentReloadTransaction(
   turnId?: string,
 ) {
   const effects: StateEffect<unknown>[] = [agentFrontmatter.of(frontmatter)];
-  if (turnId) effects.push(showAgentEdit.of({ turnId, ranges: insertedWordRanges(before, after) }));
+  if (turnId) effects.push(showAgentEdit.of({ turnId, ...agentEditDiff(before, after) }));
   return {
     changes: textDiff(before, after),
     effects,

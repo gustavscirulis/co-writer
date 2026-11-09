@@ -70,6 +70,7 @@ These shortcuts are handled by the `markdownFormatting` CodeMirror extension and
 | --------------------- | ------------------------------------------------------------------------------- |
 | Cmd+L                 | Add the selection to the Co-writer composer (the block at the caret if none)    |
 | Alt+click             | Add the clicked block to the Co-writer composer                                 |
+| Escape (editor)       | Clear Co-writer's green highlights (after closing find, popups or a selection)  |
 | Enter (composer)      | Send now; while Claude is replying, queue it instead                            |
 | Cmd+Enter (composer)  | Queue the draft (one item per attachment); on an empty composer, send the queue |
 | Backspace (composer)  | Remove the last attachment when the draft is empty                              |
