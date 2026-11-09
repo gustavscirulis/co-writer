@@ -7,6 +7,8 @@ import { firstChangePosition, historyPreviewState } from "./history-preview-exte
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 /** Versions swapped in quicker than this are being scrubbed through, not read. */
 const SCRUB_MS = 300;
+/** The dock sits 56px down, under the tabs, and is about 102px tall. */
+export const HISTORY_DOCK_CLEARANCE = 184;
 
 /** Mounts a read-only preview editor and swaps its state whenever the preview changes. */
 export function useHistoryPreviewView(path: string, preview: VersionPreview | null) {
@@ -41,7 +43,8 @@ export function useHistoryPreviewView(path: string, preview: VersionPreview | nu
     shownRef.current = true;
     view.requestMeasure({
       read: () => findOuterScroller(view.dom),
-      write: (scroller) => scroller && scrollPosToSafeTop(view, scroller, target, behavior),
+      write: (scroller) =>
+        scroller && scrollPosToSafeTop(view, scroller, target, behavior, HISTORY_DOCK_CLEARANCE),
     });
   }, [preview]);
 

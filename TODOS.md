@@ -19,6 +19,10 @@
 
 ## Done
 
+- Slow version history on long notes: `pairTables` diffed versions with `Chunk.build` and no scan limit, so a 47 KB → 67 KB rewrite took about 4.8s before the preview showed. It now shares the merge view's `scanLimit: 500` (`DIFF_CONFIG`). Opening history on that note in the built app went from about 5.8s to about 80ms; every other note with history builds its preview in under 15ms. A unit test covers a long rewritten note.
+
+- Version history dock at the top: [`SPECs/version-history-spec.md`](SPECs/version-history-spec.md). The dock moved from the bottom of the note to just under the tabs, below the History toggle, so it's harder to miss. It drops in from above, the hover tooltip shows below it, and the preview's top spacing and first-change scroll clear it (`HISTORY_DOCK_CLEARANCE`).
+
 - Dismissing Co-writer's highlights: [`SPECs/agent-edit-highlight.md`](SPECs/agent-edit-highlight.md#dismissing). The footer shows how many words Co-writer added and removed, with a Clear that fades the tint out; Esc in the editor clears too. Undo/redo and version restores keep the tint and summary in step with the text. Footer was picked from a four-way playground prototype (footer, inline hover chip, review bar, chat reply). Unit tests cover the counts, turn-scoped clear and when the summary goes; the real `DocumentFooter` was checked in the playground (without Tailwind styling). Not yet seen in the native app. Compact windows have no footer but never show highlights (no workspace, so no Co-writer turn; edits from other windows arrive as unhighlighted disk reloads).
 
 - Open a note created from the sidebar: New File (workspace and folder menus) now opens the note once the inline rename ends, by Enter, blur or Esc. The rename state carries `isNew`, so renaming an existing note still leaves it closed. `vp check` and `vp test` pass. Not yet tried in the native app: the menus are native, so the e2e harness can't reach them.
