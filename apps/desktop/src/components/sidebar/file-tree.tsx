@@ -34,12 +34,18 @@ import { flattenTree } from "./flatten-tree";
 import { useAutoRefresh } from "./use-auto-refresh";
 import type { DirEntry } from "@/types/fs";
 
+export interface RenameTarget {
+  path: string;
+  /** Set when the entry was just created, so a new note opens once named. */
+  isNew: boolean;
+}
+
 interface FileTreeProps {
   rootPath: string;
   openFile?: (path: string) => Promise<void>;
   enableContextMenus?: boolean;
-  renamingPath: string | null;
-  onRenamingPathChange: (path: string | null) => void;
+  renaming: RenameTarget | null;
+  onRenamingChange: (target: RenameTarget | null) => void;
 }
 
 function getExtension(name: string): string {
@@ -52,8 +58,8 @@ export function FileTree({
   rootPath,
   openFile: openFileOverride,
   enableContextMenus = true,
-  renamingPath,
-  onRenamingPathChange,
+  renaming,
+  onRenamingChange,
 }: FileTreeProps) {
   const directoryCache = useDirectoryCache();
   const expandedDirs = useExpandedDirs();
@@ -191,48 +197,67 @@ export function FileTree({
     [openFile, toggleDirectory],
   );
 
-  const handleRenameSubmit = useCallback(
-    async (entry: DirEntry, nextValue: string) => {
-      onRenamingPathChange(null);
-
+  /** Renames `entry` to `nextValue` and returns the path it ends up at. */
+  const renameEntry = useCallback(
+    async (entry: DirEntry, nextValue: string): Promise<string> => {
       const trimmed = nextValue.trim();
-      if (!trimmed) return;
+      if (!trimmed) return entry.path;
 
       const parent = getParentDir(entry.path);
       let newPath: string;
       let conflictMessage: string;
       if (entry.is_dir) {
         // For directories, the value is the full name.
-        if (trimmed === entry.name) return;
+        if (trimmed === entry.name) return entry.path;
         newPath = `${parent}/${trimmed}`;
         conflictMessage = `A folder named "${trimmed}" already exists.`;
       } else {
         // For files, the value is the stem only.
         const currentStem = getFileStem(entry.name);
-        if (trimmed === currentStem) return;
+        if (trimmed === currentStem) return entry.path;
         const ext = getExtension(entry.name);
         newPath = `${parent}/${trimmed}${ext}`;
         conflictMessage = `A file named "${trimmed}${ext}" already exists.`;
       }
-      if (newPath === entry.path) return;
+      if (newPath === entry.path) return entry.path;
 
       try {
         if (await tauri.fileExists(newPath)) {
           window.alert(conflictMessage);
-          return;
+          return entry.path;
         }
         await applyPathChange(entry, newPath);
         if (!entry.is_dir) await fillEmptyNoteTitle(newPath, trimmed);
+        return newPath;
       } catch (error) {
         window.alert(`Failed to rename: ${error instanceof Error ? error.message : String(error)}`);
+        return entry.path;
       }
     },
-    [applyPathChange, onRenamingPathChange],
+    [applyPathChange],
+  );
+
+  // Opening after naming lets fillEmptyNoteTitle write the heading before the editor loads.
+  const openIfNewNote = useCallback(
+    (path: string, isDir: boolean) => {
+      if (!renaming?.isNew || isDir) return;
+      void openFile(path);
+    },
+    [openFile, renaming],
+  );
+
+  const handleRenameSubmit = useCallback(
+    async (entry: DirEntry, nextValue: string) => {
+      onRenamingChange(null);
+      openIfNewNote(await renameEntry(entry, nextValue), entry.is_dir);
+    },
+    [onRenamingChange, openIfNewNote, renameEntry],
   );
 
   const handleRenameCancel = useCallback(() => {
-    onRenamingPathChange(null);
-  }, [onRenamingPathChange]);
+    onRenamingChange(null);
+    if (renaming) openIfNewNote(renaming.path, entryByPath.get(renaming.path)?.is_dir ?? true);
+  }, [entryByPath, onRenamingChange, openIfNewNote, renaming]);
 
   const { handleFileContextMenu, handleFolderContextMenu, handleBulkContextMenu } =
     useFileTreeContextMenus({
@@ -246,7 +271,7 @@ export function FileTree({
       toggleDirectory,
       refreshDirectory,
       invalidatePath,
-      setRenamingPath: onRenamingPathChange,
+      setRenaming: onRenamingChange,
       clearSelection,
     });
 
@@ -304,7 +329,7 @@ export function FileTree({
           entry={item.entry}
           depth={item.depth}
           isExpanded={item.entry.is_dir && expandedDirs.has(item.entry.path)}
-          isRenaming={renamingPath === item.entry.path}
+          isRenaming={renaming?.path === item.entry.path}
           isSelected={selectedPaths.has(item.entry.path)}
           isDragging={draggingPaths?.has(item.entry.path) ?? false}
           onToggleDir={toggleDirectory}

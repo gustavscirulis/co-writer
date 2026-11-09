@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-09
+
+- A note you create from the sidebar's New File now opens as soon as you name it, with its title filled in and the caret ready on the line below.
+
 ## 2026-11-05
 
 - Numbered lists now stay in order when you delete, cut, paste or indent a row. The numbers after it update, and one undo brings back the original.

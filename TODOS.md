@@ -19,6 +19,8 @@
 
 ## Done
 
+- Open a note created from the sidebar: New File (workspace and folder menus) now opens the note once the inline rename ends, by Enter, blur or Esc. The rename state carries `isNew`, so renaming an existing note still leaves it closed. `vp check` and `vp test` pass. Not yet tried in the native app: the menus are native, so the e2e harness can't reach them.
+
 - Numbered lists going out of order after deleting a row: [`SPECs/ordered-list-renumber-spec.md`](SPECs/ordered-list-renumber-spec.md). `orderedListRenumber` renumbers the ordered lists a row-adding or row-removing user edit touches (delete, cut, paste, Tab / Shift-Tab), in the same transaction so one undo restores the text. Keeps the list's start, the delimiter, all-same lists (`1. 1. 1.`) and hand-typed numbers. Unit tests cover each rule; checked in the playground (`?full`): delete a selected row, delete the first row, cut and paste, Tab / Shift-Tab, undo, typing a number into a marker.
 
 - Short release notes: each release gets a 3–5 bullet customer summary in `release-notes/<version>.md`, committed with the version bump, instead of the latest CHANGELOG section. `scripts/distribute.sh` reads only that file and stops before the signing checks if it's missing or blank. The writing rules are in `docs/releasing.md`.

@@ -8,6 +8,7 @@ import { createSidebarEntryAndRename } from "./create-sidebar-entry-and-rename";
 import { showSidebarSurfaceContextMenu } from "./sidebar-surface-context-menu";
 import { openSidebarDirectoryInTerminal } from "./sidebar-terminal-action";
 import { DEFAULT_SIDEBAR_SORT_MODE, isSidebarSortMode } from "./sidebar-sort";
+import type { RenameTarget } from "./file-tree";
 
 export function useSidebarSurface() {
   const setSetting = useSetSetting();
@@ -18,7 +19,7 @@ export function useSidebarSurface() {
   const foldersFirst = useBooleanSetting("appearance.sidebar-folders-first");
   const root = useWorkspaceRoot();
   const refreshDirectory = useRefreshDirectory();
-  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<RenameTarget | null>(null);
   const [everythingCollapsed, setEverythingCollapsed] = useState(false);
 
   const createRootEntry = (kind: tauri.SidebarEntryKind) => {
@@ -28,7 +29,7 @@ export function useSidebarSurface() {
       expandParent: () => setEverythingCollapsed(false),
       createEntry: (entryKind) => tauri.createSidebarEntry(root, entryKind),
       refreshRoot: () => refreshDirectory(root),
-      startRenaming: setRenamingPath,
+      startRenaming: (path) => setRenaming({ path, isNew: true }),
       isCurrentWorkspace: () => isCurrentWorkspaceIdentity(identity),
     }).catch((error: unknown) => {
       window.alert(
@@ -83,8 +84,8 @@ export function useSidebarSurface() {
     hasWorkspace: root !== null,
     onContextMenu,
     tree: {
-      renamingPath,
-      onRenamingPathChange: setRenamingPath,
+      renaming,
+      onRenamingChange: setRenaming,
       everythingCollapsed,
       onEverythingCollapsedChange: setEverythingCollapsed,
     },

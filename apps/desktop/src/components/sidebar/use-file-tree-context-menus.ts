@@ -16,6 +16,7 @@ import { showFolderContextMenu } from "./folder-context-menu";
 import { showBulkContextMenu } from "./bulk-context-menu";
 import { createSidebarEntryAndRename } from "./create-sidebar-entry-and-rename";
 import { createFolderTerminalAction } from "./sidebar-terminal-action";
+import type { RenameTarget } from "./file-tree";
 import type { DirEntry } from "@/types/fs";
 
 interface UseFileTreeContextMenusArgs {
@@ -29,7 +30,7 @@ interface UseFileTreeContextMenusArgs {
   toggleDirectory: (path: string) => Promise<void>;
   refreshDirectory: (path: string) => Promise<void>;
   invalidatePath: (path: string) => void;
-  setRenamingPath: (path: string | null) => void;
+  setRenaming: (target: RenameTarget | null) => void;
   clearSelection: () => void;
 }
 
@@ -44,7 +45,7 @@ export function useFileTreeContextMenus({
   toggleDirectory,
   refreshDirectory,
   invalidatePath,
-  setRenamingPath,
+  setRenaming,
   clearSelection,
 }: UseFileTreeContextMenusArgs) {
   const createChildEntry = useCallback(
@@ -55,7 +56,7 @@ export function useFileTreeContextMenus({
           expandedDirs.has(entry.path) ? undefined : toggleDirectory(entry.path),
         createEntry: (entryKind) => tauri.createSidebarEntry(entry.path, entryKind),
         refreshRoot: () => refreshDirectory(entry.path),
-        startRenaming: setRenamingPath,
+        startRenaming: (path) => setRenaming({ path, isNew: true }),
         isCurrentWorkspace: () => isCurrentWorkspaceIdentity(identity),
       }).catch((error: unknown) => {
         window.alert(
@@ -63,7 +64,7 @@ export function useFileTreeContextMenus({
         );
       });
     },
-    [expandedDirs, refreshDirectory, setRenamingPath, toggleDirectory, workspaceRoot],
+    [expandedDirs, refreshDirectory, setRenaming, toggleDirectory, workspaceRoot],
   );
 
   const handleFileContextMenu = useCallback(
@@ -113,7 +114,7 @@ export function useFileTreeContextMenus({
           });
         },
         onRename: () => {
-          setRenamingPath(entry.path);
+          setRenaming({ path: entry.path, isNew: false });
         },
         onDelete: () => {
           void (async () => {
@@ -143,7 +144,7 @@ export function useFileTreeContextMenus({
       pinnedFiles,
       refreshDirectory,
       removePinnedFile,
-      setRenamingPath,
+      setRenaming,
       togglePinnedFile,
       workspaceRoot,
     ],
@@ -176,7 +177,7 @@ export function useFileTreeContextMenus({
           });
         },
         onRename: () => {
-          setRenamingPath(entry.path);
+          setRenaming({ path: entry.path, isNew: false });
         },
         onDelete: () => {
           void (async () => {
@@ -217,7 +218,7 @@ export function useFileTreeContextMenus({
       invalidatePath,
       refreshDirectory,
       removePinnedFilesWithPrefix,
-      setRenamingPath,
+      setRenaming,
       workspaceRoot,
     ],
   );
