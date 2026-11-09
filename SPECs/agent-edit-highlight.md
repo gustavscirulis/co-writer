@@ -17,11 +17,26 @@ Four treatments were built in the playground and compared on the real editor: Wa
 - When the edit lands the tint is stronger (22%) for 1.2s, then settles to 10% over 700ms. Dark mode uses `#3ccf7a` at 24% / 12%. No transition with reduced motion.
 - The green matches version history's insertions, so "new" means one thing across the app and never reads as the accent-tinted selection or a link.
 
+## Dismissing
+
+Picked from a playground prototype of four placements (Footer, Inline hover chip, Review bar, Co-writer reply). Footer won.
+
+- While a Co-writer edit is showing, the document footer's left side reads "● Co-writer added 38 words and removed 4 · Clear". It also says just "added …" or just "removed …" when only one applies. Removed words get no tint, so the footer is the only place they show up.
+- Esc in the editor does the same as Clear. It runs at low precedence, so closing find, a completion popup, or collapsing a selection or multiple cursors takes Esc first; with text selected, the first Esc collapses it and the second clears.
+- Undo and redo restore the highlights and the footer summary as they were before the undone change: undoing a Co-writer edit takes its tint and summary away, redo brings both back, and undoing your own edit to a phrase brings that phrase's tint back. Clear and Esc aren't undo steps, so ⌘Z after Clear undoes text; it doesn't bring that turn's highlights back unless you undo the Co-writer edit itself.
+- Restoring a version from history clears the highlights and summary; undoing the restore brings them back.
+- Clear fades the tint out over 180ms (instant with reduced motion), then drops the highlights and the summary. A turn that lands during the fade keeps its highlights.
+- The chip goes away with the highlights: on Clear, on the next turn (which replaces it), on a swap or reload, and when the writer has edited every highlighted phrase, unless the turn removed words, in which case it stays until Clear.
+- Counts come from the unmerged word diff, so the kept filler a rewrite folds into one phrase isn't counted as removed and re-added. Several edits in one turn add up.
+- The footer shows the chip even when every word/character/paragraph metric is hidden. Compact single-file windows have no footer, and need none: they have no workspace or Co-writer panel, so no turn runs there, and another window's edit reaches them as a plain disk reload, which isn't highlighted.
+
 ## Implementation
 
 - `lib/text-diff.ts` `insertedWordRanges(before, after)`: a word-level LCS over the region `textDiff` says changed, with a semantic cleanup that stays within one line. Pure insertions slide onto a line boundary. When the region is over 4M token pairs (roughly a 2000-word rewrite) it falls back to `presentableDiff` with a 50ms timeout. `presentableDiff` alone isn't used because its character-level heuristics can splice a new sentence into an unrelated deleted one.
 - `components/editor-area/agent-edit-highlight.ts`: `showAgentEdit` effect, the decoration field, and a view plugin that sets `data-agent-fresh` on the editor for the landing pulse. It is included in `agentEditingExtensions`.
 - Block widgets: marks can't reach inside a widget that replaces its source. A below-content layer in `agent-edit-highlight.ts` draws one `writer-agent-new-block` rectangle per block widget holding a highlight (geometry shared with the ⌥-hover layer in `block-rect.ts`). The table widget sets `showsAgentEdits`, reads `agentAddedRanges(state, from, to)`, and wraps each cell's new rendered text in `writer-agent-new`; `addedCellText` maps source offsets to rendered text with the same hidden-syntax rules as the raw cell view.
+- Undo/redo: an `invertedEffects` entry adds a `restoreAgentEdit` snapshot (ranges, summary, turn id, dismissed flag) to the inverse of every doc change that changed the field. History merges a group's inverses newest first, so the field applies the last snapshot. A snapshot for the turn the writer dismissed is ignored. A `writer.agent-reload` without `showAgentEdit` (a version restore) resets the field.
+- Dismissing: `clearAgentEdit` (turn-scoped) and `clearAgentEdits(view)` in `agent-edit-highlight.ts`; the field's `summary` holds `{ added, removed }`. `summaryPublisher` writes it per path to `agent-edit-summary-store.ts`, clearing the old path's entry when a pane swap rebinds the view. `DocumentFooter` renders the chip.
 - `markAgentReload` stores the turn id; `use-prosemark-editor.ts` passes it to `agentReloadTransaction`.
 
 ## Not yet verified

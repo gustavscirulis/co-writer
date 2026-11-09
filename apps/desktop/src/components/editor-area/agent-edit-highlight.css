@@ -27,9 +27,31 @@
 .cm-editor[data-agent-fresh] .writer-agent-new-block {
   background-color: var(--writer-agent-new-fresh);
 }
+.cm-editor[data-agent-clearing] .writer-agent-new,
+.cm-editor[data-agent-clearing] .writer-agent-new-block {
+  background-color: transparent;
+  transition-duration: 180ms;
+}
+.writer-agent-edit-dot {
+  background-color: #1f9d55;
+}
+[data-theme="dark"] .writer-agent-edit-dot {
+  background-color: #3ccf7a;
+}
+.writer-agent-edit-chip {
+  animation: writer-agent-edit-chip-in 300ms ease-out;
+}
+@keyframes writer-agent-edit-chip-in {
+  from {
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .writer-agent-new,
   .writer-agent-new-block {
     transition: none;
+  }
+  .writer-agent-edit-chip {
+    animation: none;
   }
 }

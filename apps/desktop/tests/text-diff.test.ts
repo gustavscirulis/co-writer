@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { insertedWordRanges, textDiff } from "../src/lib/text-diff";
+import { agentEditDiff, insertedWordRanges, textDiff } from "../src/lib/text-diff";
 for (const [before, after] of [
   ["", "text"],
   ["text", ""],
@@ -76,4 +76,18 @@ test("inserted word ranges fall back to a character diff for very large rewrites
   const before = "old ".repeat(2500).trim();
   const after = "new ".repeat(2500).trim();
   expect(insertedWordRanges(before, after)).toEqual([{ from: 0, to: after.length }]);
+});
+
+test("agent edit counts are words, without the kept filler a rewrite folds in", () => {
+  const counts = (before: string, after: string) => {
+    const { added, removed } = agentEditDiff(before, after);
+    return { added, removed };
+  };
+  expect(counts("Leave Sunday night.", "Fly home Sunday night.")).toEqual({ added: 2, removed: 1 });
+  expect(counts("- Adapter\n", "- Adapter (type F)\n- Sunscreen\n")).toEqual({
+    added: 3,
+    removed: 0,
+  });
+  expect(counts("One, two and three.", "One.")).toEqual({ added: 0, removed: 3 });
+  expect(counts("Same.", "Same.")).toEqual({ added: 0, removed: 0 });
 });

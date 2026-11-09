@@ -7,7 +7,11 @@ import {
   agentReloadTransaction,
   watchAgentEditing,
 } from "../src/components/editor-area/agent-editing";
-import { agentEditHighlightField } from "../src/components/editor-area/agent-edit-highlight";
+import {
+  agentEditHighlightField,
+  clearAgentEdit,
+  hasAgentEdits,
+} from "../src/components/editor-area/agent-edit-highlight";
 import { acquireAgentEditing, clearAgentEditing } from "../src/lib/agent-turn";
 import { EditorView } from "@codemirror/view";
 afterEach(clearAgentEditing);
@@ -156,4 +160,110 @@ test("undoing the reload or swapping the note clears its highlights", () => {
     userEvent: "writer.swap",
   });
   expect(highlighted(editor.state)).toEqual([]);
+});
+
+const summary = (state: EditorState) => state.field(agentEditHighlightField).summary;
+
+test("a turn's summary counts added and removed words across its edits", () => {
+  const editor = harness("Pack shoes and a big coat.", null);
+  editor.change(
+    agentReloadTransaction(
+      "Pack shoes and a big coat.",
+      "Pack shoes and a light jacket.",
+      null,
+      "t1",
+    ),
+  );
+  expect(summary(editor.state)).toEqual({ added: 2, removed: 2 });
+  editor.change(
+    agentReloadTransaction(
+      "Pack shoes and a light jacket.",
+      "Pack shoes, sunscreen and a light jacket.",
+      null,
+      "t1",
+    ),
+  );
+  expect(summary(editor.state)).toEqual({ added: 3, removed: 2 });
+  editor.change(agentReloadTransaction(editor.state.doc.toString(), "Pack shoes.", null, "t2"));
+  expect(summary(editor.state)).toEqual({ added: 0, removed: 5 });
+});
+
+test("clearing drops the highlights and summary, but not a newer turn's", () => {
+  const editor = harness("A b.", null);
+  editor.change(agentReloadTransaction("A b.", "A one b.", null, "t1"));
+  editor.change(agentReloadTransaction("A one b.", "A one b two.", null, "t2"));
+  editor.change({ effects: clearAgentEdit.of({ turnId: "t1" }) });
+  expect(highlighted(editor.state)).toEqual(["two"]);
+  expect(hasAgentEdits(editor.state)).toBe(true);
+  editor.change({ effects: clearAgentEdit.of({ turnId: "t2" }) });
+  expect(highlighted(editor.state)).toEqual([]);
+  expect(summary(editor.state)).toBeNull();
+  expect(hasAgentEdits(editor.state)).toBe(false);
+});
+
+test("the summary goes once every new phrase is edited, unless words were removed", () => {
+  const editor = harness("A b.", null);
+  editor.change(agentReloadTransaction("A b.", "A one b.", null, "t1"));
+  const at = editor.state.doc.toString().indexOf("one") + 1;
+  editor.change({ changes: { from: at, insert: "x" } });
+  expect(summary(editor.state)).toBeNull();
+  editor.change(agentReloadTransaction(editor.state.doc.toString(), "A b.", null, "t2"));
+  editor.change({ changes: { from: 0, insert: "Z " } });
+  expect(summary(editor.state)).toEqual({ added: 0, removed: 1 });
+  editor.change({
+    changes: { from: 0, to: editor.state.doc.length, insert: "Other note." },
+    userEvent: "writer.swap",
+  });
+  expect(summary(editor.state)).toBeNull();
+});
+
+test("undo takes a Co-writer edit's highlights and summary with it, and redo brings them back", () => {
+  const editor = harness("Pack shoes and a big coat.", null);
+  editor.change(
+    agentReloadTransaction(
+      "Pack shoes and a big coat.",
+      "Pack shoes and a light jacket.",
+      null,
+      "t1",
+    ),
+  );
+  expect(undo(editor)).toBe(true);
+  expect(highlighted(editor.state)).toEqual([]);
+  expect(summary(editor.state)).toBeNull();
+  expect(redo(editor)).toBe(true);
+  expect(highlighted(editor.state)).toEqual(["light jacket"]);
+  expect(summary(editor.state)).toEqual({ added: 2, removed: 2 });
+});
+
+test("undoing the writer's edit to a phrase brings its highlight back", () => {
+  const editor = harness("A b.", null);
+  editor.change(agentReloadTransaction("A b.", "A one b.", null, "t1"));
+  const at = editor.state.doc.toString().indexOf("one") + 1;
+  editor.change({ changes: { from: at, insert: "x" }, userEvent: "input.type" });
+  expect(highlighted(editor.state)).toEqual([]);
+  expect(undo(editor)).toBe(true);
+  expect(highlighted(editor.state)).toEqual(["one"]);
+  expect(summary(editor.state)).toEqual({ added: 1, removed: 0 });
+});
+
+test("after Clear, undoing later typing doesn't bring the highlights back", () => {
+  const editor = harness("A b.", null);
+  editor.change(agentReloadTransaction("A b.", "A one b.", null, "t1"));
+  editor.change({ changes: { from: 0, insert: "Z " }, userEvent: "input.type" });
+  editor.change({ effects: clearAgentEdit.of({ turnId: "t1" }) });
+  expect(undo(editor)).toBe(true);
+  expect(editor.state.doc.toString()).toBe("A one b.");
+  expect(highlighted(editor.state)).toEqual([]);
+  expect(summary(editor.state)).toBeNull();
+});
+
+test("a version restore clears the highlights, and undoing it brings them back", () => {
+  const editor = harness("A b. C d.", null);
+  editor.change(agentReloadTransaction("A b. C d.", "A one b. C d two.", null, "t1"));
+  editor.change(agentReloadTransaction("A one b. C d two.", "A one b. C d.", null));
+  expect(highlighted(editor.state)).toEqual([]);
+  expect(summary(editor.state)).toBeNull();
+  expect(undo(editor)).toBe(true);
+  expect(highlighted(editor.state)).toEqual(["one", "two"]);
+  expect(summary(editor.state)).toEqual({ added: 2, removed: 0 });
 });
