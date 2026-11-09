@@ -114,6 +114,16 @@ describe("history preview", () => {
     }
     expect(kinds).toEqual(["inserted", "inserted"]);
   });
+
+  test("builds quickly when a version rewrote most of a long note", () => {
+    const note = (seed: string) =>
+      Array.from({ length: 2500 }, (_, i) => `${seed} paragraph ${(i * 7919) % 2500} here.`).join(
+        "\n\n",
+      );
+    const started = performance.now();
+    historyPreviewState(note("Rewritten"), note("Original"), () => "/n.md");
+    expect(performance.now() - started).toBeLessThan(500);
+  });
 });
 
 describe("version timeline", () => {

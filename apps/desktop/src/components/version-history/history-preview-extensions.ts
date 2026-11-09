@@ -1,6 +1,6 @@
 import { ChangeSet, EditorState, Facet, Text } from "@codemirror/state";
 import { EditorView, drawSelection } from "@codemirror/view";
-import { Chunk, getChunks, unifiedMergeView } from "@codemirror/merge";
+import { Chunk, getChunks, unifiedMergeView, type DiffConfig } from "@codemirror/merge";
 import type { Parser } from "@lezer/common";
 import { prosemarkBasicSetup, prosemarkBaseThemeSetup } from "@/lib/prosemark-core/main";
 import { headingWeightHighlight, writerMarkdown } from "@/components/editor-area/editor-extensions";
@@ -14,6 +14,9 @@ import {
   tableRanges,
 } from "@/components/editor-area/table-decorations";
 import { viewportParsePlugin } from "@/components/editor-area/viewport-parse";
+
+// Without a scan limit, a large rewrite between versions takes seconds to diff.
+const DIFF_CONFIG: DiffConfig = { scanLimit: 500 };
 
 // A trailing empty line gives the parked selection somewhere to sit that
 // touches no markdown node, so live-preview hiding renders the whole note.
@@ -44,7 +47,7 @@ const tableBaselines = Facet.define<ReadonlyMap<number, string>, ReadonlyMap<num
  * starting at a table would also show the old table as raw markdown.
  */
 function pairTables(doc: Text, original: Text, parser: Parser) {
-  const chunks = Chunk.build(original, doc);
+  const chunks = Chunk.build(original, doc, DIFF_CONFIG);
   const oldTables = tableRanges(original, parser.parse(original.toString()));
   const baselines = new Map<number, string>();
   const swaps: { from: number; to: number; insert: string }[] = [];
@@ -108,6 +111,7 @@ export function historyPreviewState(
         mergeControls: false,
         allowInlineDiffs: true,
         gutter: false,
+        diffConfig: DIFF_CONFIG,
       }),
       EditorView.editorAttributes.of({ class: "writer-history-preview" }),
     ],

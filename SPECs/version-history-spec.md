@@ -60,6 +60,7 @@ Pruning runs on workspace open, after indexing. Per note:
   - An overlay over the editor pane. The live editor stays mounted underneath but is made invisible, because the window background is translucent.
   - It uses its own read-only `EditorView` with a reduced extension set (see [docs/editor.md](../docs/editor.md)) and `@codemirror/merge`'s `unifiedMergeView`.
   - The selected version is diffed against the version before it, and the preview scrolls the first change to just below the dock (`HISTORY_DOCK_CLEARANCE` in `use-history-preview-view.ts`, also the preview's top spacing). The preview fades out under the dock, because WebKit drops the dock's backdrop blur over the masked scroller.
+  - Both diffs (the table pairing in `pairTables` and the merge view) share one `scanLimit: 500` config. Without a limit, a version that rewrote most of a long note took seconds to diff before the preview appeared.
 - **Restore:** taken under the agent-editing lock after saving, and applied to every open alias as one undoable step through the agent reload path. Restore is blocked while a Claude turn is active on the note.
 
 ## Known limits

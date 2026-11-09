@@ -2,6 +2,8 @@
 
 ## 2026-11-09
 
+- Version history now opens right away on long notes. A note whose last version rewrote most of it used to take several seconds to show the preview.
+
 - Version history now opens at the top of the note, just under the History button, instead of along the bottom where it was easy to miss.
 
 - After a Co-writer edit, the footer now says how many words it added and removed, with a Clear button that fades the green tint away. Pressing Esc in the note does the same. Undoing a Co-writer edit now removes its tint and summary, redo brings them back, and restoring an older version clears them.
