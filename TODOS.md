@@ -19,6 +19,8 @@
 
 ## Done
 
+- Editing queued Co-writer notes: [`SPECs/chat-queue.md`](SPECs/chat-queue.md#contract). Clicking a queued item added its text to the draft, so editing two notes (or one with a draft) gave every chip the combined text. Esc or Backspace deleted the note, the item wasn't saved while out, plain messages moved to the end, re-pointing a detached note didn't work, and the "Keep" flag was lost. Now one item at a time, only from an empty composer, edited in place with `queued` (`feedback-store.ts`); `putBack`/`clearAttached` restore it and `persist` saves it as pending. Store and chat-store tests cover each case; `e2e/specs/co-writer-queue.spec.js` adds an edit / Esc / re-queue flow.
+
 - Slow version history on long notes: `pairTables` diffed versions with `Chunk.build` and no scan limit, so a 47 KB → 67 KB rewrite took about 4.8s before the preview showed. It now shares the merge view's `scanLimit: 500` (`DIFF_CONFIG`). Opening history on that note in the built app went from about 5.8s to about 80ms; every other note with history builds its preview in under 15ms. A unit test covers a long rewritten note.
 
 - Version history dock at the top: [`SPECs/version-history-spec.md`](SPECs/version-history-spec.md). The dock moved from the bottom of the note to just under the tabs, below the History toggle, so it's harder to miss. It drops in from above, the hover tooltip shows below it, and the preview's top spacing and first-change scroll clear it (`HISTORY_DOCK_CLEARANCE`).

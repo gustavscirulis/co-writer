@@ -1691,6 +1691,15 @@ test("a clean turn sends everything queued during it as one merged turn", async 
   expect(channels).toHaveLength(2);
 });
 
+test("sending an edited queued message now takes it out of the queue", async () => {
+  useFeedbackStore.getState().saveNotes("/notes/a.md", "Draft question");
+  const id = feedbackItems()[0]!.id;
+  expect(useFeedbackStore.getState().takeBack("/notes/a.md", id)).toBe("Draft question");
+  await send("Edited question", { feedbackIds: [id] });
+  expect(feedbackItems()).toEqual([]);
+  expect(chatMessages("/notes/a.md").at(-1)).toMatchObject({ text: "Edited question" });
+});
+
 test.each([
   ["Stop", () => useClaudeStore.getState().stop("/notes/a.md")],
   ["an error", () => emit({ type: "result", is_error: true, result: "Boom" })],

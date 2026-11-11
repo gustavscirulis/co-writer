@@ -59,12 +59,15 @@ export function NotesTray({
   path,
   notes,
   open,
+  canEdit,
   onToggle,
   onTakeBack,
 }: {
   path: string;
   notes: FeedbackItem[];
   open: boolean;
+  /** Editing moves an item into the composer, so it waits until the composer is empty. */
+  canEdit: boolean;
   onToggle: () => void;
   onTakeBack: (text: string) => void;
 }) {
@@ -120,7 +123,8 @@ export function NotesTray({
             >
               <button
                 type="button"
-                title="Edit in the composer"
+                title={canEdit ? "Edit in the composer" : "Send or queue your message first"}
+                disabled={!canEdit}
                 onClick={() => {
                   const text = takeBackFeedback(path, item.id);
                   clearAttachmentHighlight();
@@ -128,7 +132,7 @@ export function NotesTray({
                   if (item.anchor) revealAttachment(path, item.anchor);
                   onTakeBack(text);
                 }}
-                className="flex min-w-0 flex-1 flex-col text-left text-[12.5px] leading-normal text-[var(--text-primary)]"
+                className="flex min-w-0 flex-1 flex-col text-left text-[12.5px] leading-normal text-[var(--text-primary)] disabled:cursor-default"
               >
                 {item.anchor && (
                   <span className="truncate text-[11px] text-[var(--text-muted)]">

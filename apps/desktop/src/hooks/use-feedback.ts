@@ -19,6 +19,7 @@ export const removeFeedback = (path: string, id: string) => store().remove(path,
 export const clearAttachedFeedback = (path: string) => store().clearAttached(path);
 export const saveFeedbackNotes = (path: string, text: string) => store().saveNotes(path, text);
 export const takeBackFeedback = (path: string, id: string) => store().takeBack(path, id);
+export const putBackFeedback = (path: string, id: string) => store().putBack(path, id);
 export const acknowledgeFeedback = (path: string, id: string) => store().acknowledge(path, id);
 export const retryFeedbackPersistence = () => store().retryPersistence();
 export const dismissFeedbackError = (path: string) => store().dismissError(path);

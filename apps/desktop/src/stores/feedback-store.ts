@@ -27,6 +27,8 @@ export interface FeedbackItem {
   status: "attached" | "pending" | "running";
   reviewRequired: boolean;
   createdAt: number;
+  /** Set while a queued item is back in the composer; how it reads in the queue. */
+  queued?: { feedback: string; reviewRequired: boolean };
 }
 export interface FeedbackHighlight {
   path: string;
@@ -63,8 +65,10 @@ interface FeedbackState {
   /** Puts attachments back in the composer when their message failed to send. */
   restore: (path: string, items: FeedbackItem[]) => void;
   saveNotes: (path: string, text: string) => number;
-  /** Moves a note back into the composer and returns its text. */
+  /** Moves a note back into the composer, in place, and returns its text. */
   takeBack: (path: string, id: string) => string | null;
+  /** Returns a note being edited to the queue unchanged. */
+  putBack: (path: string, id: string) => void;
   acknowledge: (path: string, id: string) => void;
   reconcile: (path: string, before: string | null, after: string, changes?: ChangeDesc) => void;
   rewritePaths: (oldPath: string, newPath: string, directory: boolean) => void;
@@ -95,12 +99,18 @@ const deferredRewrites: {
 const key = (root: string) => `workspace:${root}:paragraph-feedback:v2`;
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+function requeue({ queued, ...item }: FeedbackItem): FeedbackItem {
+  return queued ? { ...item, ...queued, status: "pending" } : item;
+}
+
 function persist(root: string, byPath: FeedbackState["byPath"], immediate = false) {
   const snapshot = {
     version: 2 as const,
     items: Object.values(byPath)
       .flat()
-      .filter((item) => item.status !== "attached"),
+      .flatMap((item) =>
+        item.status !== "attached" ? [item] : item.queued ? [requeue(item)] : [],
+      ),
   };
   snapshots.set(root, snapshot);
   retained.set(root, snapshot);
@@ -319,27 +329,34 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     changeItems(
       path,
       (items) =>
-        items.some(
-          (item) =>
-            item.status === "attached" &&
-            item.anchor?.from === target.from &&
-            item.anchor?.to === target.to &&
-            item.quote === quote,
-        )
-          ? items
-          : [
-              ...items,
-              {
-                id: crypto.randomUUID(),
-                path,
-                anchor: target,
-                quote,
-                feedback: "",
-                status: "attached",
-                reviewRequired: false,
-                createdAt: Date.now(),
-              },
-            ],
+        // A note whose text changed takes the next target as its new place.
+        items.some((item) => item.queued && item.anchor && !item.anchor.attached)
+          ? items.map((item) =>
+              item.queued && item.anchor && !item.anchor.attached
+                ? { ...item, anchor: target, quote }
+                : item,
+            )
+          : items.some(
+                (item) =>
+                  item.status === "attached" &&
+                  item.anchor?.from === target.from &&
+                  item.anchor?.to === target.to &&
+                  item.quote === quote,
+              )
+            ? items
+            : [
+                ...items,
+                {
+                  id: crypto.randomUUID(),
+                  path,
+                  anchor: target,
+                  quote,
+                  feedback: "",
+                  status: "attached",
+                  reviewRequired: false,
+                  createdAt: Date.now(),
+                },
+              ],
       false,
     );
     return true;
@@ -352,13 +369,12 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     );
   },
   clearAttached: (path) =>
-    changeItems(
-      path,
-      (items) =>
-        items.some((item) => item.status === "attached")
-          ? items.filter((item) => item.status !== "attached")
-          : items,
-      false,
+    changeItems(path, (items) =>
+      items.some((item) => item.status === "attached")
+        ? items.flatMap((item) =>
+            item.status !== "attached" ? [item] : item.queued ? [requeue(item)] : [],
+          )
+        : items,
     ),
   take: (path, ids) => {
     const taken = (get().byPath[path] ?? EMPTY_ITEMS).filter(
@@ -409,7 +425,9 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     changeItems(path, (items) =>
       count
         ? items.map((item) =>
-            item.status === "attached" ? { ...item, feedback, status: "pending" } : item,
+            item.status === "attached"
+              ? { ...requeue(item), feedback, status: "pending", reviewRequired: false }
+              : item,
           )
         : [
             ...items,
@@ -428,15 +446,24 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     return count || 1;
   },
   takeBack: (path, id) => {
-    const item = get().byPath[path]?.find((entry) => entry.id === id);
-    if (closing || !item || item.status !== "pending") return null;
-    if (item.anchor) {
-      updateItem(path, id, (entry) => ({ ...entry, status: "attached", reviewRequired: false }));
-    } else {
-      changeItems(path, (items) => items.filter((entry) => entry !== item));
-    }
+    const items = get().byPath[path] ?? EMPTY_ITEMS;
+    const item = items.find((entry) => entry.id === id);
+    if (closing || !item || item.status !== "pending" || items.some((entry) => entry.queued))
+      return null;
+    updateItem(path, id, (entry) => ({
+      ...entry,
+      status: "attached",
+      reviewRequired: false,
+      queued: { feedback: entry.feedback, reviewRequired: entry.reviewRequired },
+    }));
     return item.feedback;
   },
+  putBack: (path, id) =>
+    changeItems(path, (items) =>
+      items.some((item) => item.id === id && item.queued)
+        ? items.map((item) => (item.id === id && item.queued ? requeue(item) : item))
+        : items,
+    ),
   acknowledge: (path, id) => updateItem(path, id, (item) => ({ ...item, reviewRequired: false })),
   reconcile: (path, before, after, changes) => {
     if (!get().loaded) return;

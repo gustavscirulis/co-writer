@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-11
+
+- Editing a queued Co-writer message is more reliable. Its text no longer merges with your draft or with another note you're editing: you edit one at a time, from an empty message box. It keeps its place in the queue, Esc puts it back unchanged instead of deleting it, and it's no longer lost if the app reloads while you're editing. Clicking a note whose text changed now lets you point it at new text.
+
 ## 2026-11-09
 
 - Version history now opens right away on long notes. A note whose last version rewrote most of it used to take several seconds to show the preview.

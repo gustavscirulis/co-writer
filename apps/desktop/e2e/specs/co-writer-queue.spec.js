@@ -31,6 +31,16 @@ describe("Co-writer queue", function () {
     );
   }
 
+  // React only sees a value change that goes through the native setter plus an input event.
+  async function fill(value) {
+    await browser.execute((next) => {
+      const input = document.querySelector('textarea[aria-label="Message"]');
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(input, next);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    }, value);
+  }
+
   async function shot(name) {
     if (!SHOTS) return;
     // Let entrance animations settle so the capture shows the final layout.
@@ -77,6 +87,64 @@ describe("Co-writer queue", function () {
     const stop = await $('button[aria-label="Stop"]');
     if (await stop.isExisting()) await stop.click();
     if (filePath) await invoke("delete_entry", { path: filePath });
+  });
+
+  it("edits one queued message at a time, in place, and Esc puts it back", async function () {
+    this.timeout(60_000);
+    const queueTexts = () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('ul[aria-label="Queue"] li')].map((row) =>
+          row.textContent.trim(),
+        ),
+      );
+    // Each row's first button edits it; returns whether it was enabled and clicks it if asked.
+    const edit = (text, click = false) =>
+      browser.execute(
+        (wanted, press) => {
+          const button = [...document.querySelectorAll('ul[aria-label="Queue"] li')]
+            .find((row) => row.textContent.trim() === wanted)
+            ?.querySelector("button");
+          if (!button || button.disabled) return false;
+          if (press) button.click();
+          return true;
+        },
+        text,
+        click,
+      );
+    await composer().click();
+    for (const message of ["edit one", "edit two", "edit three"]) {
+      await composer().addValue(message);
+      await press("Enter", { metaKey: true });
+    }
+    await tray().waitForExist({ timeout: 5_000 });
+    if ((await tray().getAttribute("aria-expanded")) !== "true") await tray().click();
+
+    await composer().addValue("unsent draft");
+    ok(!(await edit("edit one")), "editing should wait for an empty composer");
+    await fill("");
+
+    ok(await edit("edit one", true), "editing should work from an empty composer");
+    ok((await composer().getValue()) === "edit one", "the message should fill the composer");
+    ok(!(await edit("edit two")), "only one message can be out for editing");
+    await press("Escape");
+    await browser.waitUntil(async () => (await queueTexts()).length === 3, {
+      timeout: 5_000,
+      timeoutMsg: "Esc should put the message back in the queue",
+    });
+    ok((await composer().getValue()) === "", "Esc should clear the composer");
+
+    ok(await edit("edit two", true), "edit two should be editable again");
+    await fill("edit two, revised");
+    await press("Enter", { metaKey: true });
+    await browser.waitUntil(async () => (await queueTexts()).length === 3, { timeout: 5_000 });
+    const texts = await queueTexts();
+    ok(
+      texts[0] === "edit one" && texts[1] === "edit two, revised" && texts[2] === "edit three",
+      `the edited message should keep its place, got ${JSON.stringify(texts)}`,
+    );
+    await shot("queue-after-edit");
+    while (await $('button[aria-label="Remove from queue"]').isExisting())
+      await $('button[aria-label="Remove from queue"]').click();
   });
 
   it("sends the whole queue with the draft last when Enter is pressed", async function () {
