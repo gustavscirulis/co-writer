@@ -55,7 +55,7 @@ export function ClaudePanel({ maxWidth }: { maxWidth: number }) {
         role="separator"
         aria-label="Resize Co-writer"
         aria-orientation="vertical"
-        aria-valuemin={260}
+        aria-valuemin={CHAT_MIN_WIDTH}
         aria-valuemax={maxWidth}
         aria-valuenow={clampChatWidth(width, maxWidth)}
         tabIndex={0}

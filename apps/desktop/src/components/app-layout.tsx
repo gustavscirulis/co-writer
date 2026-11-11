@@ -52,7 +52,11 @@ function WorkspaceLayout({ showWelcome }: { showWelcome: boolean }) {
   const permissions = useToolPermissions(useChatPath());
   const chatWidth = useChatPanelWidth();
   const viewportWidth = useViewportWidth();
-  const maxSidebarWidth = Math.max(280, Math.min(420, Math.floor(viewportWidth * 0.35)));
+  const chatVisible = !showWelcome && activeShowsChat && (chatPreferred || permissions.length > 0);
+  const maxSidebarWidth = Math.min(
+    Math.max(280, Math.min(420, Math.floor(viewportWidth * 0.35))),
+    viewportWidth - (chatVisible ? CHAT_MIN_WIDTH : 0) - EDITOR_MIN_WIDTH,
+  );
   const draggingRef = useRef(false);
   const [isSidebarDragging, setIsSidebarDragging] = useState(false);
   const [draftSidebarWidth, setDraftSidebarWidth] = useState(() =>
@@ -60,7 +64,6 @@ function WorkspaceLayout({ showWelcome }: { showWelcome: boolean }) {
   );
   const draftSidebarWidthRef = useRef(draftSidebarWidth);
   const historyOpen = useHistoryPath() === activeFilePath;
-  const chatVisible = !showWelcome && activeShowsChat && (chatPreferred || permissions.length > 0);
   const maxChatWidth = Math.max(
     CHAT_MIN_WIDTH,
     viewportWidth - (isSidebarCollapsed ? 0 : draftSidebarWidth) - EDITOR_MIN_WIDTH,
