@@ -92,8 +92,12 @@ test("attachments dedupe, save as one note each, and can be taken back into the 
   ]);
   expect(store().takeBack(path, items()[1]!.id)).toBe("Tighten");
   expect(items()[1]!.status).toBe("attached");
+  store().attach(path, second!);
   store().clearAttached(path);
-  expect(items()).toHaveLength(1);
+  expect(items().map((item) => [item.status, item.feedback])).toEqual([
+    ["pending", "Tighten"],
+    ["pending", "Tighten"],
+  ]);
 });
 
 test("a message without chips queues unanchored, persists, and is sent as a plain message", async () => {
@@ -109,10 +113,63 @@ test("a message without chips queues unanchored, persists, and is sent as a plai
   expect(prompt).toContain(`{"id":"${queued!.id}","message":"Also add a summary"}`);
 });
 
-test("taking back an unanchored message removes it from the queue", () => {
+test("an edited item keeps its place, and only one can be out at a time", () => {
+  const anchored = create("Paragraph", 0, "Anchored");
+  store().saveNotes(path, "First");
+  store().saveNotes(path, "Second");
+  const [, first, second] = items().map((item) => item.id);
+  expect(store().takeBack(path, first!)).toBe("First");
+  expect(store().takeBack(path, anchored)).toBeNull();
+  expect(store().takeBack(path, second!)).toBeNull();
+  expect(store().saveNotes(path, "First, edited")).toBe(1);
+  expect(items().map((item) => [item.id, item.status, item.feedback])).toEqual([
+    [anchored, "pending", "Anchored"],
+    [first, "pending", "First, edited"],
+    [second, "pending", "Second"],
+  ]);
+  expect(items().some((item) => item.queued)).toBe(false);
+});
+
+test("an item out for editing is saved as queued and goes back unchanged", async () => {
+  const id = create("Paragraph", 0, "Original");
+  store().complete(store().begin(path, [id]), { status: "failed", changed: true, error: null });
+  expect(store().takeBack(path, id)).toBe("Original");
+  expect(items()[0]).toMatchObject({ status: "attached", reviewRequired: false });
+  await flushFeedbackPersistence(root);
+  const saved = data.values().next().value as { items: unknown[] };
+  expect(saved.items).toEqual([
+    expect.objectContaining({ id, status: "pending", feedback: "Original", reviewRequired: true }),
+  ]);
+  expect(saved.items[0]).not.toHaveProperty("queued");
+  store().putBack(path, id);
+  expect(items()).toEqual([
+    expect.objectContaining({ id, status: "pending", feedback: "Original", reviewRequired: true }),
+  ]);
+  expect(items()[0]).not.toHaveProperty("queued");
   store().saveNotes(path, "Plain");
-  expect(store().takeBack(path, items()[0]!.id)).toBe("Plain");
-  expect(items()).toEqual([]);
+  store().takeBack(path, items()[1]!.id);
+  await flushFeedbackPersistence(root);
+  await store().load(root, store().generation + 1);
+  expect(items().map((item) => [item.status, item.feedback])).toEqual([
+    ["pending", "Original"],
+    ["pending", "Plain"],
+  ]);
+});
+
+test("attaching while a detached note is out for editing re-points it", () => {
+  const id = create("Target\n\nOther");
+  const before = EditorState.create({ doc: "Target\n\nOther" });
+  const tr = before.update({ changes: { from: 3, insert: "\n\n" } });
+  store().reconcile(path, before.doc.toString(), tr.newDoc.toString(), tr.changes);
+  expect(items()[0]!.anchor?.attached).toBe(false);
+  store().takeBack(path, id);
+  const other = feedbackTargets(tr.newDoc.toString()).find((target) => target.text === "Other")!;
+  store().attach(path, other);
+  expect(items()).toEqual([
+    expect.objectContaining({ id, anchor: expect.objectContaining({ text: "Other" }) }),
+  ]);
+  store().saveNotes(path, "Make it clearer");
+  expect(items()[0]).toMatchObject({ status: "pending", anchor: { attached: true } });
 });
 
 test("canonical checkpoints map duplicate transactions exactly once", () => {

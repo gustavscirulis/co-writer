@@ -20,8 +20,12 @@ Saved notes and queued messages are one system: the feedback store's `pending` i
   - Stop, failure or a rejected send returns them to `pending` and pauses the queue with a turn error ("Stopped. Your queue is paused."). Nothing auto-sends until the next clean turn or Send all.
   - A failed or stopped turn that changed the note still marks its items "Keep" (`reviewRequired`).
 - **Editing**
-  - Clicking an anchored note moves it back into the composer as a chip plus its text.
-  - Clicking a plain message removes it and appends its text to the draft.
+  - Clicking a queued item moves it into the composer: an anchored note as a chip plus its text, a plain message as the draft.
+  - Only one item can be out for editing, and only from an empty composer (no text, no chips). Otherwise the tray's items are disabled ("Send or queue your message first"), so texts never merge.
+  - The item keeps its place in the queue. Queuing again saves the new text there; sending now sends and removes it.
+  - Esc, or Backspace on an empty draft, puts it back unchanged, including its "Keep" review flag.
+  - While it's out it is still saved as queued, with its old text, so a reload or quit doesn't lose it.
+  - A detached note ("Text changed · click to re-point") takes the next text you attach as its new place.
   - × removes either kind.
 - **Persistence**
   - The queue persists per workspace (feedback data version 2, which now also accepts `null` anchors).
@@ -31,6 +35,7 @@ Saved notes and queued messages are one system: the feedback store's `pending` i
 - `stores/feedback-store.ts` owns the items:
   - `saveNotes` queues plain messages.
   - `isQueueReady` decides what can be sent.
+  - `takeBack` marks an item `attached` in place with `queued` (its queue text and review flag); `putBack` and `clearAttached` restore it, and `persist` saves it as pending.
   - `prepare` builds the queue prompt. Anchored items keep their location fields; plain ones become `{id, message}`.
   - `complete` removes the items on any completed, error-free outcome.
 - `stores/claude-store.ts` `sendQueue(path, ids?)` owns sending: it calls `begin` and sends a turn whose `prepare` and `complete` call back into the feedback store. `finish()` calls it after a turn that wasn't cancelled and had no error. `hooks/use-feedback.ts` `applyFeedback` forwards to it.

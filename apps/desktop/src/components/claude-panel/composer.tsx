@@ -35,6 +35,7 @@ import {
   applyFeedback,
   canApplyFeedback,
   clearAttachedFeedback,
+  putBackFeedback,
   removeFeedback,
   saveFeedbackNotes,
   useDocumentFeedback,
@@ -149,6 +150,11 @@ export function Composer() {
       ),
     [items],
   );
+  // A queued item back in the composer for editing; at most one at a time.
+  const editing = useMemo(
+    () => items.find((item) => item.status === "attached" && item.queued),
+    [items],
+  );
   // Running items already show in the thread as the sent message.
   const notes = useMemo(() => items.filter((item) => item.status === "pending"), [items]);
   const [trayOpen, setTrayOpen] = useState(false);
@@ -233,13 +239,21 @@ export function Composer() {
   const send = () => {
     void sendChat(path, text, {
       attachments: attached.map((item) => ({ anchor: item.anchor, quote: item.quote })),
-      feedbackIds: attached.map((item) => item.id),
+      feedbackIds: [
+        ...attached.map((item) => item.id),
+        ...(editing && !editing.anchor ? [editing.id] : []),
+      ],
       files,
     });
     if (attached.length) clearAttachmentHighlight();
   };
   const empty = !text.trim() && !attached.length;
   const ready = useMemo(() => notes.filter(canApplyFeedback), [notes]);
+  const putBack = (id: string) => {
+    putBackFeedback(path, id);
+    setChatDraft(path, "");
+    clearAttachmentHighlight();
+  };
   const queue = (flush: boolean) => {
     if (!queues) return;
     if (!empty) {
@@ -273,9 +287,10 @@ export function Composer() {
           path={path}
           notes={notes}
           open={trayOpen}
+          canEdit={!text.trim() && !attached.length && !editing}
           onToggle={() => setTrayOpen(!trayOpen)}
           onTakeBack={(note) => {
-            setChatDraft(path, text.trim() ? `${text.trimEnd()}\n${note}` : note);
+            setChatDraft(path, note);
             focusChatComposer();
           }}
         />
@@ -328,11 +343,13 @@ export function Composer() {
             placeholder={
               attached.length
                 ? "What should change here?"
-                : busy && queues
-                  ? "Queue a follow-up…"
-                  : planMode
-                    ? "Describe what you want planned…"
-                    : "Ask anything, or describe a change…"
+                : editing
+                  ? "Edit the queued message · Esc puts it back"
+                  : busy && queues
+                    ? "Queue a follow-up…"
+                    : planMode
+                      ? "Describe what you want planned…"
+                      : "Ask anything, or describe a change…"
             }
             value={text}
             onChange={(event) => {
@@ -405,13 +422,22 @@ export function Composer() {
               } else if (event.key === "Backspace" && !text && chips.length) {
                 event.preventDefault();
                 removeChatFile(path, chips[chips.length - 1]!);
+              } else if (
+                event.key === "Backspace" &&
+                !text &&
+                editing &&
+                (!editing.anchor || attached[attached.length - 1]?.id === editing.id)
+              ) {
+                event.preventDefault();
+                putBack(editing.id);
               } else if (event.key === "Backspace" && !text && attached.length) {
                 event.preventDefault();
                 removeFeedback(path, attached[attached.length - 1]!.id);
                 clearAttachmentHighlight();
-              } else if (event.key === "Escape" && attached.length) {
+              } else if (event.key === "Escape" && (attached.length || editing)) {
                 event.preventDefault();
                 clearAttachedFeedback(path);
+                if (editing) setChatDraft(path, "");
                 clearAttachmentHighlight();
               }
             }}
