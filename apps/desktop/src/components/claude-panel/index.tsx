@@ -13,12 +13,13 @@ import {
 import { PermissionRequest } from "./permission-request";
 import { Composer } from "./composer";
 import { MessageList } from "./message-list";
+import { CHAT_MIN_WIDTH } from "@/lib/window-min-width";
 
 const HEADER_BUTTON =
   "grid size-7 place-items-center rounded-[7px] text-[var(--text-icon-muted)] transition-colors duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] disabled:opacity-40";
 
 export function clampChatWidth(width: number, maxWidth: number) {
-  return Math.max(260, Math.min(maxWidth, Math.round(width)));
+  return Math.max(CHAT_MIN_WIDTH, Math.min(maxWidth, Math.round(width)));
 }
 
 export function ClaudePanel({ maxWidth }: { maxWidth: number }) {
@@ -54,7 +55,7 @@ export function ClaudePanel({ maxWidth }: { maxWidth: number }) {
         role="separator"
         aria-label="Resize Co-writer"
         aria-orientation="vertical"
-        aria-valuemin={260}
+        aria-valuemin={CHAT_MIN_WIDTH}
         aria-valuemax={maxWidth}
         aria-valuenow={clampChatWidth(width, maxWidth)}
         tabIndex={0}

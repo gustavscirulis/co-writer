@@ -20,9 +20,16 @@ import { WelcomeScreen } from "./welcome";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useWorkspaceChromeMode, useWorkspaceRoot } from "@/hooks/use-workspace";
 import { resolveAppView } from "@/lib/app-view";
+import {
+  CHAT_MIN_WIDTH,
+  EDITOR_MIN_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  windowMinWidth,
+} from "@/lib/window-min-width";
+import { useWindowMinWidth } from "@/hooks/use-window-min-width";
 
 function clampSidebarWidth(width: number, maxSidebarWidth: number) {
-  return Math.max(220, Math.min(maxSidebarWidth, Math.round(width)));
+  return Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxSidebarWidth, Math.round(width)));
 }
 
 export function AppLayout() {
@@ -45,7 +52,11 @@ function WorkspaceLayout({ showWelcome }: { showWelcome: boolean }) {
   const permissions = useToolPermissions(useChatPath());
   const chatWidth = useChatPanelWidth();
   const viewportWidth = useViewportWidth();
-  const maxSidebarWidth = Math.max(280, Math.min(420, Math.floor(viewportWidth * 0.35)));
+  const chatVisible = !showWelcome && activeShowsChat && (chatPreferred || permissions.length > 0);
+  const maxSidebarWidth = Math.min(
+    Math.max(280, Math.min(420, Math.floor(viewportWidth * 0.35))),
+    viewportWidth - (chatVisible ? CHAT_MIN_WIDTH : 0) - EDITOR_MIN_WIDTH,
+  );
   const draggingRef = useRef(false);
   const [isSidebarDragging, setIsSidebarDragging] = useState(false);
   const [draftSidebarWidth, setDraftSidebarWidth] = useState(() =>
@@ -53,11 +64,11 @@ function WorkspaceLayout({ showWelcome }: { showWelcome: boolean }) {
   );
   const draftSidebarWidthRef = useRef(draftSidebarWidth);
   const historyOpen = useHistoryPath() === activeFilePath;
-  const chatVisible = !showWelcome && activeShowsChat && (chatPreferred || permissions.length > 0);
   const maxChatWidth = Math.max(
-    260,
-    viewportWidth - (isSidebarCollapsed ? 0 : draftSidebarWidth) - 320,
+    CHAT_MIN_WIDTH,
+    viewportWidth - (isSidebarCollapsed ? 0 : draftSidebarWidth) - EDITOR_MIN_WIDTH,
   );
+  useWindowMinWidth(windowMinWidth({ sidebar: !isSidebarCollapsed, chat: chatVisible }));
   const tabChromeLeft = isSidebarCollapsed ? 132 : draftSidebarWidth + 12;
 
   const setClampedSidebarWidth = useCallback(

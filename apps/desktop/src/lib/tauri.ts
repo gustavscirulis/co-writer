@@ -5,7 +5,7 @@ import {
   rewriteDocumentPaths,
 } from "@/lib/agent-turn";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import sidebarEntryKinds from "@shared/sidebar-entry-kinds.json";
 import type {
@@ -358,6 +358,10 @@ export function showMainWindow(): Promise<void> {
  *  so the main window is hidden rather than destroyed (`lib.rs`). */
 export function closeWindow(): Promise<void> {
   return getCurrentWindow().close();
+}
+
+export function setWindowMinSize(width: number, height: number): Promise<void> {
+  return getCurrentWindow().setMinSize(new LogicalSize(width, height));
 }
 
 // Image commands

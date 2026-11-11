@@ -2,6 +2,8 @@
 
 ## 2026-11-11
 
+- You can make the window much narrower when the sidebar and Co-writer are both hidden: it now goes down to 540 points wide, instead of 800. With a panel open, the note always keeps at least 480 points, and the panels shrink before the note does. If you open a panel in a window that's too narrow for it, the window widens to fit.
+
 - Editing a queued Co-writer message is more reliable. Its text no longer merges with your draft or with another note you're editing: you edit one at a time, from an empty message box. It keeps its place in the queue, Esc puts it back unchanged instead of deleting it, and it's no longer lost if the app reloads while you're editing. Clicking a note whose text changed now lets you point it at new text.
 
 ## 2026-11-09
