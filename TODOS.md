@@ -19,6 +19,8 @@
 
 ## Done
 
+- Window minimum width that depends on which panels are open: the static `minWidth: 800` assumed the sidebar and Co-writer were both open. `useWindowMinWidth` now sets the minimum from `windowMinWidth()` (`lib/window-min-width.ts`): 400 with no panels, 540 with the sidebar, 580 with Co-writer, 800 with both. The same constants feed the sidebar, chat and editor clamps. In the built app, opening each panel widened a squashed window to exactly those values. Dragging the window edge by hand hasn't been tried yet, because the driver's resizes skip macOS's minimum size.
+
 - Editing queued Co-writer notes: [`SPECs/chat-queue.md`](SPECs/chat-queue.md#contract). Clicking a queued item added its text to the draft, so editing two notes (or one with a draft) gave every chip the combined text. Esc or Backspace deleted the note, the item wasn't saved while out, plain messages moved to the end, re-pointing a detached note didn't work, and the "Keep" flag was lost. Now one item at a time, only from an empty composer, edited in place with `queued` (`feedback-store.ts`); `putBack`/`clearAttached` restore it and `persist` saves it as pending. Store and chat-store tests cover each case; `e2e/specs/co-writer-queue.spec.js` adds an edit / Esc / re-queue flow.
 
 - Slow version history on long notes: `pairTables` diffed versions with `Chunk.build` and no scan limit, so a 47 KB → 67 KB rewrite took about 4.8s before the preview showed. It now shares the merge view's `scanLimit: 500` (`DIFF_CONFIG`). Opening history on that note in the built app went from about 5.8s to about 80ms; every other note with history builds its preview in under 15ms. A unit test covers a long rewritten note.

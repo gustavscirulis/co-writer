@@ -21,6 +21,8 @@ import {
 } from "@/hooks/use-tabs";
 import { openStandaloneFile } from "@/hooks/use-open-drop";
 import { getFileName } from "@/lib/paths";
+import { COLLAPSED_MIN_WIDTH } from "@/lib/window-min-width";
+import { useWindowMinWidth } from "@/hooks/use-window-min-width";
 
 const PICKER_POPUP_ID = "compact-file-picker-popup";
 const PICKER_ANIMATION_MS = 260;
@@ -54,6 +56,7 @@ interface PickerFrameGeometry {
 export function CompactFileLayout() {
   const activeFilePath = useActiveFilePath();
   const openFiles = useOpenFiles();
+  useWindowMinWidth(COLLAPSED_MIN_WIDTH);
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false);
   const [isPickerMounted, setIsPickerMounted] = useState(false);
   const [isTriggerHovered, setIsTriggerHovered] = useState(false);
