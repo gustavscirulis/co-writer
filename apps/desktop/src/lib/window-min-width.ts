@@ -2,8 +2,8 @@
 export const EDITOR_MIN_WIDTH = 480;
 export const SIDEBAR_MIN_WIDTH = 220;
 export const CHAT_MIN_WIDTH = 260;
-/** With both panels hidden the editor is the whole window and may go narrower. */
-export const COLLAPSED_MIN_WIDTH = 400;
+/** The window's floor with both panels hidden, when the editor is the whole window. */
+export const COLLAPSED_MIN_WIDTH = 540;
 export const WINDOW_MIN_HEIGHT = 500;
 
 export function windowMinWidth({ sidebar, chat }: { sidebar: boolean; chat: boolean }) {
