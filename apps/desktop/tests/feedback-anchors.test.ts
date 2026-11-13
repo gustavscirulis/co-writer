@@ -3,6 +3,7 @@ import { EditorState } from "@codemirror/state";
 import {
   feedbackTargets,
   feedbackTargetAt,
+  feedbackTargetOnLine,
   mapFeedbackAnchor,
   recoverFeedbackAnchor,
 } from "../src/lib/feedback-anchors";
@@ -30,6 +31,25 @@ test.each([
   const targets = feedbackTargets(source);
   expect(targets[0]?.kind).toBe(kind);
   expect(targets[0]?.text).toBe(source.slice(targets[0]!.from, targets[0]!.to));
+});
+
+test("hovered lines resolve list, task and quote targets that start after their marker", () => {
+  const source = "- First\n1. Second\n- [ ] Task\n\n> Quote\n\nBody";
+  const targets = feedbackTargets(source);
+  const lines = EditorState.create({ doc: source }).doc;
+  const onLine = (n: number) => {
+    const line = lines.line(n);
+    return feedbackTargetOnLine(targets, line.from, line.to)?.text ?? null;
+  };
+  expect([1, 2, 3, 4, 5, 6, 7].map(onLine)).toEqual([
+    "First",
+    "Second",
+    "[ ] Task",
+    null,
+    "Quote",
+    null,
+    "Body",
+  ]);
 });
 
 test("nested prose resolves independent deepest blocks, and whitespace/frontmatter do not target", () => {

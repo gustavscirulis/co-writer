@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-13
+
+- The Add to Co-writer button now appears to the right of list items, task items and quotes when you hover them. Before, it only showed for paragraphs, headings and other blocks that start at the beginning of the line.
+
 ## 2026-11-11
 
 - You can make the window much narrower when the sidebar and Co-writer are both hidden: it now goes down to 540 points wide, instead of 800. With a panel open, the note always keeps at least 480 points, and the panels shrink before the note does. If you open a panel in a window that's too narrow for it, the window widens to fit.
