@@ -23,6 +23,7 @@ import { useFeedbackStore } from "@/stores/feedback-store";
 import {
   attachmentRange,
   feedbackTargetIn,
+  feedbackTargetOnLine,
   feedbackTargets,
   type FeedbackAnchor,
 } from "@/lib/feedback-anchors";
@@ -366,9 +367,7 @@ function feedbackGutter(getPath: () => string) {
         const y = event.clientY - view.documentTop;
         const inside = y >= 0 && y <= view.contentHeight;
         const line = inside ? view.lineBlockAtHeight(y) : null;
-        const target = line
-          ? (this.targetList().find((t) => t.from <= line.from && line.from <= t.to) ?? null)
-          : null;
+        const target = line ? feedbackTargetOnLine(this.targetList(), line.from, line.to) : null;
         if (target?.from === this.hovered?.from && target?.to === this.hovered?.to) return;
         this.hovered = target;
         this.measure();

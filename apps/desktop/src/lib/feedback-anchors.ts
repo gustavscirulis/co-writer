@@ -93,6 +93,11 @@ export function feedbackTargetIn(targets: FeedbackAnchor[], pos: number, side: -
   );
 }
 
+/** List and quote targets start after their marker, so match on overlap, not line start. */
+export function feedbackTargetOnLine(targets: FeedbackAnchor[], from: number, to: number) {
+  return targets.find((target) => target.from <= to && from <= target.to) ?? null;
+}
+
 export function feedbackTargetAt(source: string, pos: number, side: -1 | 1 = 1) {
   return feedbackTargetIn(feedbackTargets(source), pos, side);
 }
