@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-17
+
+- Press Cmd+Shift+T to reopen the tab you just closed, like in Chrome. Press it again to keep going back through closed tabs. Each one returns to where it was in the tab bar, with its back and forward history.
+
 ## 2026-11-13
 
 - The Add to Co-writer button now appears to the right of list items, task items and quotes when you hover them. Before, it only showed for paragraphs, headings and other blocks that start at the beginning of the line.

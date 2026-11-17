@@ -57,12 +57,21 @@ export interface SessionTab {
   forward: SerializedLocation[];
 }
 
+export interface ClosedTab {
+  location: Location;
+  back: Location[];
+  forward: Location[];
+  index: number;
+}
+
 interface EditorState {
   openFiles: Map<string, OpenFile>;
   pruneUnreferencedFiles: () => void;
   tabs: Tab[];
   activeTabId: string | null;
   activeFilePath: string | null;
+  /** Recently closed tabs, newest last, for Cmd+Shift+T. In memory only. */
+  closedTabs: ClosedTab[];
 
   openFile: (path: string) => Promise<void>;
   openCompactFile: (path: string, prefetched?: FileContent | null) => Promise<void>;
@@ -74,6 +83,7 @@ interface EditorState {
   closeFile: (path: string) => void;
   closeTab: (tabId: string) => void;
   closeActiveTab: () => void;
+  reopenClosedTab: () => Promise<void>;
   moveTab: (tabId: string, toIndex: number) => void;
   setActiveFile: (path: string) => void;
   setActiveTab: (tabId: string) => void;
@@ -273,12 +283,74 @@ function removeFromLocation(location: Location, path: string): Location | null {
   return locationBehavior(location).removePath(location as never, path) as Location | null;
 }
 
-function applyRewriteToTab(tab: Tab, rewrite: (loc: Location) => Location | null): Tab | null {
+function applyRewriteToTab<T extends Pick<Tab, "location" | "back" | "forward">>(
+  tab: T,
+  rewrite: (loc: Location) => Location | null,
+): T | null {
   const newLocation = rewrite(tab.location);
   if (!newLocation) return null;
   const back = tab.back.map(rewrite).filter((l): l is Location => l !== null);
   const forward = tab.forward.map(rewrite).filter((l): l is Location => l !== null);
   return { ...tab, location: newLocation, back, forward };
+}
+
+function rewriteClosedTabs(
+  closedTabs: ClosedTab[],
+  rewrite: (loc: Location) => Location | null,
+): ClosedTab[] {
+  if (closedTabs.length === 0) return closedTabs;
+  return closedTabs
+    .map((entry) => applyRewriteToTab(entry, rewrite))
+    .filter((entry): entry is ClosedTab => entry !== null);
+}
+
+const MAX_CLOSED_TABS = 25;
+
+function sameLocation(a: Location, b: Location) {
+  return JSON.stringify(serializeLocation(a)) === JSON.stringify(serializeLocation(b));
+}
+
+function removeTab(set: EditorStateSetter, tabId: string, remember: boolean) {
+  set((state) => {
+    const index = getTabIndex(state.tabs, tabId);
+    if (index === -1) return state;
+
+    const closedTab = state.tabs[index]!;
+    let tabs = state.tabs.filter((tab) => tab.id !== tabId);
+
+    let activeTabId = state.activeTabId;
+    if (tabs.length === 0) {
+      const launcherTab = createLauncherTab();
+      tabs = [launcherTab];
+      activeTabId = launcherTab.id;
+    } else if (state.activeTabId === tabId) {
+      activeTabId = tabs[index]?.id ?? tabs[index - 1]?.id ?? null;
+    }
+
+    const files = maybePruneFiles(state, tabs, tabPaths(closedTab));
+    const closedTabs =
+      remember && closedTab.location.kind !== "launcher"
+        ? [
+            ...state.closedTabs,
+            {
+              location: closedTab.location,
+              back: closedTab.back,
+              forward: closedTab.forward,
+              index,
+            },
+          ].slice(-MAX_CLOSED_TABS)
+        : null;
+
+    return {
+      tabs,
+      activeTabId,
+      activeFilePath: deriveActiveFilePath(tabs, activeTabId),
+      ...(files ? { openFiles: files } : {}),
+      ...(closedTabs ? { closedTabs } : {}),
+    };
+  });
+
+  pendingNavigationVersionByTabId.delete(tabId);
 }
 
 /** Record what's on disk when a note opens, so the state before any edit is kept. */
@@ -369,6 +441,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   tabs: [],
   activeTabId: null,
   activeFilePath: null,
+  closedTabs: [],
 
   openFile: async (path: string) => {
     const state = get();
@@ -417,7 +490,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     try {
       await loadPromise;
     } catch {
-      get().closeTab(nextTab.id);
+      removeTab(set as EditorStateSetter, nextTab.id, false);
     }
   },
 
@@ -463,6 +536,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const prunedFiles = maybePruneFiles(baseState, tabs, candidatePaths);
       return {
         tabs,
+        closedTabs: [],
         activeTabId: nextTab.id,
         activeFilePath: path,
         ...(prunedFiles
@@ -480,7 +554,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     try {
       await loadPromise;
     } catch {
-      get().closeTab(nextTab.id);
+      removeTab(set as EditorStateSetter, nextTab.id, false);
     }
   },
 
@@ -505,7 +579,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     try {
       await ensureFileLoaded(path, set as EditorStateSetter, get);
     } catch {
-      get().closeTab(nextTab.id);
+      removeTab(set as EditorStateSetter, nextTab.id, false);
       throw new Error(`Failed to open ${path}`);
     }
   },
@@ -636,38 +710,65 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   closeTab: (tabId: string) => {
-    set((state) => {
-      const index = getTabIndex(state.tabs, tabId);
-      if (index === -1) return state;
-
-      const closedTab = state.tabs[index]!;
-      let tabs = state.tabs.filter((tab) => tab.id !== tabId);
-
-      let activeTabId = state.activeTabId;
-      if (tabs.length === 0) {
-        const launcherTab = createLauncherTab();
-        tabs = [launcherTab];
-        activeTabId = launcherTab.id;
-      } else if (state.activeTabId === tabId) {
-        activeTabId = tabs[index]?.id ?? tabs[index - 1]?.id ?? null;
-      }
-
-      const files = maybePruneFiles(state, tabs, tabPaths(closedTab));
-
-      return {
-        tabs,
-        activeTabId,
-        activeFilePath: deriveActiveFilePath(tabs, activeTabId),
-        ...(files ? { openFiles: files } : {}),
-      };
-    });
-
-    pendingNavigationVersionByTabId.delete(tabId);
+    removeTab(set as EditorStateSetter, tabId, true);
   },
 
   closeActiveTab: () => {
     const activeTabId = get().activeTabId;
     if (activeTabId) get().closeTab(activeTabId);
+  },
+
+  reopenClosedTab: async () => {
+    const state = get();
+    const entry = state.closedTabs[state.closedTabs.length - 1];
+    if (!entry) return;
+    const closedTabs = state.closedTabs.slice(0, -1);
+
+    const existing = state.tabs.find((tab) => sameLocation(tab.location, entry.location));
+    if (existing) {
+      set({
+        closedTabs,
+        activeTabId: existing.id,
+        activeFilePath: deriveActiveFilePath(state.tabs, existing.id),
+      });
+      return;
+    }
+
+    const nextTab: Tab = {
+      id: createTabId(),
+      location: entry.location,
+      back: entry.back,
+      forward: entry.forward,
+    };
+    const path = locationPrimaryPath(entry.location);
+
+    set((currentState) => {
+      const tabs = [...currentState.tabs];
+      const activeIndex = getTabIndex(tabs, currentState.activeTabId ?? "");
+      if (activeIndex !== -1 && tabs[activeIndex]!.location.kind === "launcher") {
+        tabs[activeIndex] = nextTab;
+      } else {
+        tabs.splice(Math.min(entry.index, tabs.length), 0, nextTab);
+      }
+      const openFiles =
+        path && !currentState.openFiles.has(path)
+          ? new Map(currentState.openFiles).set(path, createLoadingFile(path))
+          : undefined;
+      return {
+        tabs,
+        closedTabs,
+        activeTabId: nextTab.id,
+        activeFilePath: path,
+        ...(openFiles ? { openFiles } : {}),
+      };
+    });
+
+    if (!path) return;
+    try {
+      await ensureFileLoaded(path, set as EditorStateSetter, get);
+    } catch {
+      removeTab(set as EditorStateSetter, nextTab.id, false);
+    }
   },
 
   moveTab: (tabId: string, toIndex: number) => {
@@ -885,6 +986,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         openFiles: files,
         tabs,
+        closedTabs: rewriteClosedTabs(state.closedTabs, rewrite),
         activeFilePath: state.activeFilePath === oldPath ? newPath : state.activeFilePath,
       };
     });
@@ -913,6 +1015,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         tabs,
+        closedTabs: rewriteClosedTabs(state.closedTabs, transform),
         activeTabId,
         activeFilePath: deriveActiveFilePath(tabs, activeTabId),
         ...(files ? { openFiles: files } : {}),
@@ -962,6 +1065,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         tabs,
+        closedTabs: rewriteClosedTabs(state.closedTabs, transform),
         activeTabId,
         activeFilePath: deriveActiveFilePath(tabs, activeTabId),
         openFiles: files,
@@ -1020,6 +1124,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         tabs,
+        closedTabs: rewriteClosedTabs(state.closedTabs, transform),
         openFiles: files,
         activeFilePath: state.activeFilePath ? rewritePath(state.activeFilePath) : null,
       };
@@ -1057,6 +1162,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         openFiles: new Map(),
         tabs: [],
+        closedTabs: [],
         activeTabId: null,
         activeFilePath: null,
       });
@@ -1111,6 +1217,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         openFiles: files,
         tabs: restoredTabs,
+        closedTabs: [],
         activeTabId: activeTab?.id ?? null,
         activeFilePath: activePath,
       };

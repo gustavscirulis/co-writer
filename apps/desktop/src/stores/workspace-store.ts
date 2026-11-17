@@ -122,6 +122,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     useEditorStore.setState({
       openFiles: new Map(),
       tabs: [],
+      closedTabs: [],
       activeTabId: null,
       activeFilePath: null,
     });
@@ -179,6 +180,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       useEditorStore.setState({
         openFiles: new Map(),
         tabs: [],
+        closedTabs: [],
         activeTabId: null,
         activeFilePath: null,
       });
@@ -205,6 +207,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     useEditorStore.setState({
       openFiles: new Map(),
       tabs: [],
+      closedTabs: [],
       activeTabId: null,
       activeFilePath: null,
     });

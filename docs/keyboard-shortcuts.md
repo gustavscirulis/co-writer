@@ -15,6 +15,7 @@ These shortcuts are handled by the global `useKeyboardShortcuts` hook and work r
 | Cmd+N           | Create new note                                                    |
 | Cmd+T           | New tab                                                            |
 | Cmd+W           | Close current tab; hides the window when only the launcher is left |
+| Cmd+Shift+T     | Reopen the last closed tab (repeat to go further back)             |
 | Cmd+\\          | Toggle sidebar                                                     |
 | Ctrl+Tab        | Next tab                                                           |
 | Ctrl+Shift+Tab  | Previous tab                                                       |
@@ -25,13 +26,18 @@ These shortcuts are handled by the global `useKeyboardShortcuts` hook and work r
 | Alt+ArrowLeft   | Navigate back                                                      |
 | Alt+ArrowRight  | Navigate forward                                                   |
 
+Cmd+Shift+T brings tabs back newest first, at the position they were closed
+from and with their back/forward history. Empty New tab pages aren't
+remembered, a tab whose note is already open just focuses that tab, and the
+list lasts until the window closes.
+
 Zoom scales the note text only, in preset stops (50–300%); the sidebar, tab
 strip, and status bar keep their size. The current percent is the global
 `editor.zoom` setting (Preferences → Editor → Zoom), restored on launch, and
 is multiplied on top of `editor.font-size`, which it never changes.
 
 In compact single-file windows, sidebar and tab-management shortcuts do not
-create hidden UI state: Cmd+\\, Cmd+T, Ctrl+Tab, Ctrl+Shift+Tab, and Cmd+1 ...
+create hidden UI state: Cmd+\\, Cmd+T, Cmd+Shift+T, Ctrl+Tab, Ctrl+Shift+Tab, and Cmd+1 ...
 Cmd+9, Cmd+Shift+L and Cmd+Shift+H are ignored. Cmd+P, Cmd+O, Cmd+N, zoom, and history navigation still
 work.
 
