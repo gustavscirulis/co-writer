@@ -244,6 +244,7 @@ describe("editor-store", () => {
     useEditorStore.setState({
       openFiles: new Map(),
       tabs: [],
+      closedTabs: [],
       activeTabId: null,
       activeFilePath: null,
     });
@@ -383,6 +384,101 @@ describe("editor-store", () => {
     ]);
     expect(state.activeFilePath).toBeNull();
     expect(state.openFiles.size).toBe(0);
+  });
+
+  describe("reopenClosedTab", () => {
+    beforeEach(() => {
+      mockedInvoke.mockImplementation(async (cmd, args) =>
+        cmd === "read_file"
+          ? { path: (args as { path: string }).path, content: "x", modified_at: 1 }
+          : undefined,
+      );
+    });
+
+    const ids = () => useEditorStore.getState().tabs.map((tab) => tab.id);
+    const reopen = () => useEditorStore.getState().reopenClosedTab();
+
+    test("restores closed tabs newest first, at their index, with history", async () => {
+      useEditorStore.setState({
+        tabs: [
+          makeFileTab("a", "/a.md"),
+          { ...makeFileTab("b", "/b.md"), back: [{ kind: "file", path: "/z.md" }] },
+          makeFileTab("c", "/c.md"),
+        ],
+        activeTabId: "a",
+      });
+      useEditorStore.getState().closeTab("b");
+      useEditorStore.getState().closeTab("c");
+      expect(tabPaths()).toEqual(["/a.md"]);
+
+      await reopen();
+      expect(tabPaths()).toEqual(["/a.md", "/c.md"]);
+      await reopen();
+      const state = useEditorStore.getState();
+      expect(tabPaths()).toEqual(["/a.md", "/b.md", "/c.md"]);
+      expect(state.tabs[1]).toMatchObject({ back: [{ kind: "file", path: "/z.md" }] });
+      expect(state.activeTabId).toBe(state.tabs[1]!.id);
+      expect(state.activeFilePath).toBe("/b.md");
+      expect(state.openFiles.get("/b.md")?.isLoading).toBe(false);
+
+      await reopen();
+      expect(tabPaths()).toEqual(["/a.md", "/b.md", "/c.md"]);
+    });
+
+    test("closing the last tab then reopening replaces the auto launcher", async () => {
+      useEditorStore.setState({ tabs: [makeFileTab("a", "/a.md")], activeTabId: "a" });
+      useEditorStore.getState().closeTab("a");
+
+      await reopen();
+      expect(useEditorStore.getState().tabs).toHaveLength(1);
+      expect(tabPaths()).toEqual(["/a.md"]);
+    });
+
+    test("launcher tabs and failed opens are not remembered", async () => {
+      useEditorStore.getState().openNewTab();
+      useEditorStore.getState().closeActiveTab();
+      mockedInvoke.mockRejectedValueOnce(new Error("missing"));
+      await expect(useEditorStore.getState().openFileInNewTab("/gone.md")).rejects.toThrow();
+
+      expect(useEditorStore.getState().closedTabs).toEqual([]);
+    });
+
+    test("an already-open location is focused instead of duplicated", async () => {
+      useEditorStore.setState({
+        tabs: [makeFileTab("a", "/a.md"), makeFileTab("b", "/b.md")],
+        activeTabId: "b",
+      });
+      useEditorStore.getState().closeTab("a");
+      useEditorStore.setState({
+        tabs: [makeFileTab("b", "/b.md"), makeFileTab("a2", "/a.md")],
+        activeTabId: "b",
+      });
+
+      await reopen();
+      expect(ids()).toEqual(["b", "a2"]);
+      expect(useEditorStore.getState().activeTabId).toBe("a2");
+      expect(useEditorStore.getState().closedTabs).toEqual([]);
+    });
+
+    test("renames and deletes update remembered tabs", async () => {
+      useEditorStore.setState({
+        tabs: [makeFileTab("a", "/a.md"), makeFileTab("b", "/b.md"), makeFileTab("c", "/c.md")],
+        activeTabId: "c",
+      });
+      useEditorStore.getState().closeTab("a");
+      useEditorStore.getState().closeTab("b");
+      useEditorStore.getState().rewritePathPrefix("/a.md", "/renamed.md");
+      useEditorStore.getState().removePathReferences("/b.md");
+
+      expect(useEditorStore.getState().closedTabs).toEqual([
+        {
+          location: { kind: "file", path: "/renamed.md" },
+          back: [],
+          forward: [],
+          index: 0,
+        },
+      ]);
+    });
   });
 
   test("navigateToFile updates active tab history", async () => {

@@ -32,6 +32,7 @@ export function useKeyboardShortcuts() {
         setActiveTab,
         openNewTab,
         closeActiveTab,
+        reopenClosedTab,
         navigateBack,
         navigateForward,
       } = useEditorStore.getState();
@@ -106,6 +107,14 @@ export function useKeyboardShortcuts() {
       if (mod && e.key === "o") {
         e.preventDefault();
         if (root) openCommandPalette("search");
+        return;
+      }
+
+      // Cmd+Shift+T — reopen the last closed tab
+      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        if (isCompactFileMode) return;
+        if (root) void reopenClosedTab();
         return;
       }
 
