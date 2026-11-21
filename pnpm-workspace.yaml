@@ -48,7 +48,7 @@ catalog:
 
 catalogMode: prefer
 overrides:
-  "@voidzero-dev/vite-plus-test>vite": 8.0.14
+  "@voidzero-dev/vite-plus-test>vite": 8.3.8
   basic-ftp: 5.3.1
   fast-xml-builder: 1.1.7
   fast-xml-parser: 5.7.0
