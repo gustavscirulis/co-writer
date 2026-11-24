@@ -6,6 +6,7 @@ import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { toggleSidebar } from "@/hooks/use-sidebar";
 import { resetZoom, zoomIn, zoomOut } from "@/hooks/zoom-api";
+import { zoomShortcutStep } from "@/lib/zoom";
 import { getWorkspaceChromeMode } from "@/lib/compact-mode";
 import { closeWindow } from "@/lib/tauri";
 
@@ -138,26 +139,15 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // Cmd+= / Cmd++ / Cmd+numpad + — zoom in; Cmd+- — zoom out; Cmd+0 —
-      // actual size. Editor text zoom (a percent on top of Font Size), so it
-      // needs no workspace and compact windows take it too. Alt chords are
-      // left alone: Cmd+Alt+0 is the editor's "strip heading".
-      if (mod && !e.altKey) {
-        if (e.key === "=" || e.key === "+" || e.code === "NumpadAdd") {
-          e.preventDefault();
-          zoomIn();
-          return;
-        }
-        if (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract") {
-          e.preventDefault();
-          zoomOut();
-          return;
-        }
-        if (e.key === "0" || e.code === "Digit0" || e.code === "Numpad0") {
-          e.preventDefault();
-          resetZoom();
-          return;
-        }
+      // Editor text zoom (a percent on top of Font Size), so it needs no
+      // workspace and compact windows take it too.
+      const zoomStep = zoomShortcutStep(e);
+      if (zoomStep) {
+        e.preventDefault();
+        if (zoomStep === "in") zoomIn();
+        else if (zoomStep === "out") zoomOut();
+        else resetZoom();
+        return;
       }
 
       // Cmd+1 through Cmd+9 — jump to Nth tab

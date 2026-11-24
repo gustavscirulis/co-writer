@@ -15,6 +15,7 @@ import {
   normalizeZoom,
   zoomInFrom,
   zoomOutFrom,
+  zoomShortcutStep,
 } from "../src/lib/zoom";
 import { resetZoom, zoomIn, zoomOut } from "../src/hooks/zoom-api";
 import { useSettingsStore } from "../src/stores/settings-store";
@@ -88,6 +89,26 @@ describe("zoom stepping", () => {
     expect(normalizeZoom(Number.NaN)).toBe(DEFAULT_ZOOM);
     expect(zoomInFrom(undefined)).toBe(110);
     expect(zoomOutFrom(undefined)).toBe(90);
+  });
+});
+
+describe("zoom shortcut chords", () => {
+  const key = (init: Partial<KeyboardEvent>) => ({
+    key: "",
+    code: "",
+    metaKey: false,
+    ctrlKey: false,
+    altKey: false,
+    ...init,
+  });
+
+  test("maps Cmd/Ctrl chords to a step and ignores bare or Alt chords", () => {
+    expect(zoomShortcutStep(key({ key: "=", metaKey: true }))).toBe("in");
+    expect(zoomShortcutStep(key({ key: "+", ctrlKey: true }))).toBe("in");
+    expect(zoomShortcutStep(key({ key: "_", metaKey: true }))).toBe("out");
+    expect(zoomShortcutStep(key({ key: "0", code: "Digit0", metaKey: true }))).toBe("reset");
+    expect(zoomShortcutStep(key({ key: "=" }))).toBeNull();
+    expect(zoomShortcutStep(key({ key: "0", metaKey: true, altKey: true }))).toBeNull();
   });
 });
 

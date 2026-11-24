@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-24
+
+- When you expand an embed, its content now sits in the middle of the window instead of at the top. Zoom it like a photo with Cmd+= and Cmd+- or by pinching the trackpad, and scroll with two fingers to move around once it's bigger than the window. Cmd+0 sets it back to actual size.
+
 ## 2026-11-17
 
 - Press Cmd+Shift+T to reopen the tab you just closed, like in Chrome. Press it again to keep going back through closed tabs. Each one returns to where it was in the tab bar, with its back and forward history.

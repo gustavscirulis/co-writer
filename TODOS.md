@@ -5,6 +5,7 @@
 - Embeds in notes: [`SPECs/embeds-spec.md`](SPECs/embeds-spec.md). One widget and a provider registry for live content, sandboxed away from the app.
   - Done: inline HTML (` ```html embed `), sized to its content, with live editing, an error badge and a Co-writer authoring guide. Unit tests and the playground pass; `e2e/specs/embed.spec.js` checks isolation in the built app.
   - Done: Expand button on embeds and images that opens them in a modal (`lib/widget-overlay.ts`, shared with mermaid fullscreen). Checked in the playground: opening, closing with Esc (including from inside the frame), ✕ and the backdrop, focus going back to the editor, the caret staying put, and mermaid fullscreen still working. Not yet tried in the native app.
+  - Done: expanded embeds center their content, zoom with Cmd+= / Cmd+- / Cmd+0 and pinch, and pan with two-finger scroll, photo-style (one transformed layer, clamped to the frame). The frame script does it (`embed-frame.html`); the overlay forwards the shortcuts when focus is outside the frame so they don't zoom the editor. `e2e/specs/embed-expanded.spec.js` checks centering, zoom, pinch and pan in the built app.
   - Next: video and audio files (`![](clip.mp4)`).
   - Next: service players (YouTube, Vimeo, Loom, Figma, CodePen, Google Maps, Spotify).
   - Next: web pages, live when the site allows framing and a link card otherwise.

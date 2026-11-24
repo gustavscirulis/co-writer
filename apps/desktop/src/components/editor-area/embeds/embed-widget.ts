@@ -4,8 +4,9 @@ import { EditorSelection } from "@codemirror/state";
 import { type EditorView, WidgetType } from "@codemirror/view";
 import { EXPAND_ICON_PATHS, makeWidgetButton, setWidgetButtonIcon } from "@/lib/widget-buttons";
 import { openWidgetOverlay } from "@/lib/widget-overlay";
+import { type ZoomStep, zoomShortcutStep } from "@/lib/zoom";
 import type { EmbedSpec } from "./embed-providers";
-import { clampFrameHeight, parseFrameMessage, renderMessage } from "./frame-messages";
+import { clampFrameHeight, parseFrameMessage, renderMessage, zoomMessage } from "./frame-messages";
 import "./embed.css";
 
 // App-served frames must never get `allow-same-origin`: with it, embed code
@@ -35,6 +36,7 @@ interface EmbedHandle {
 interface KindHandle {
   update(spec: EmbedSpec): boolean;
   reload(): void;
+  zoom(step: ZoomStep): void;
   destroy(): void;
 }
 
@@ -188,7 +190,23 @@ function openExpanded(spec: EmbedSpec): void {
         onEscape: close,
       });
       panel.append(error.el);
-      return { panel, destroy: () => content.destroy() };
+      // Cmd+=/-/0 pressed while focus is in the app (the ✕ button, by
+      // default) would otherwise zoom the editor text behind the overlay.
+      const onKeyDown = (event: KeyboardEvent) => {
+        const step = zoomShortcutStep(event);
+        if (!step) return;
+        event.preventDefault();
+        event.stopPropagation();
+        content.zoom(step);
+      };
+      document.addEventListener("keydown", onKeyDown, true);
+      return {
+        panel,
+        destroy: () => {
+          document.removeEventListener("keydown", onKeyDown, true);
+          content.destroy();
+        },
+      };
     },
   });
 }
@@ -233,7 +251,7 @@ function mountHtml(box: HTMLElement, initialHtml: string, ctx: MountContext): Ki
     if (!message) return;
     if (message.type === "ready" && !rendered) {
       rendered = true;
-      iframe.contentWindow?.postMessage(renderMessage(html), "*");
+      iframe.contentWindow?.postMessage(renderMessage(html, ctx.expanded), "*");
     } else if (message.type === "height" && !ctx.expanded) {
       const height = clampFrameHeight(message.height);
       frameHeightCache.set(ctx.key, height);
@@ -257,6 +275,9 @@ function mountHtml(box: HTMLElement, initialHtml: string, ctx: MountContext): Ki
       return true;
     },
     reload: load,
+    zoom(step) {
+      if (rendered) iframe.contentWindow?.postMessage(zoomMessage(step), "*");
+    },
     destroy() {
       if (reloadTimer) clearTimeout(reloadTimer);
       window.removeEventListener("message", onMessage);

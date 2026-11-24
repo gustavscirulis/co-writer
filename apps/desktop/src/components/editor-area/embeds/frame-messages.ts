@@ -1,5 +1,7 @@
 // The postMessage contract with `src-tauri/src/embed-frame.html`.
 
+import type { ZoomStep } from "@/lib/zoom";
+
 export const MIN_FRAME_HEIGHT = 40;
 export const MAX_FRAME_HEIGHT = 2000;
 
@@ -37,6 +39,11 @@ export function clampFrameHeight(height: number): number {
   return Math.min(MAX_FRAME_HEIGHT, Math.max(MIN_FRAME_HEIGHT, Math.ceil(height)));
 }
 
-export function renderMessage(html: string) {
-  return { source: "writer-embed", type: "render", html };
+/** `expanded` makes the frame center its content and take zoom input. */
+export function renderMessage(html: string, expanded: boolean) {
+  return { source: "writer-embed", type: "render", html, expanded };
+}
+
+export function zoomMessage(step: ZoomStep) {
+  return { source: "writer-embed", type: "zoom", step };
 }
