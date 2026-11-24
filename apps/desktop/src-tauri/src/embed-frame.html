@@ -33,9 +33,140 @@
       });
       document.write(String(data.html));
       document.close();
+      if (data.expanded === true) enableExpanded();
       new ResizeObserver(reportHeight).observe(document.documentElement);
       reportHeight();
     });
+
+    // Same bounds and feel as the mermaid canvas (`mermaid-canvas.ts`).
+    const ZOOM_MIN = 0.25;
+    const ZOOM_MAX = 4;
+    const KEY_ZOOM_FACTOR = 1.15;
+    const WHEEL_ZOOM_SENSITIVITY = 0.0015;
+    const PINCH_ZOOM_SENSITIVITY = 0.01;
+
+    // Copy of `zoomShortcutStep` in `src/lib/zoom.ts`.
+    const zoomShortcutStep = (e) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return null;
+      if (e.key === "=" || e.key === "+" || e.code === "NumpadAdd") return "in";
+      if (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract") return "out";
+      if (e.key === "0" || e.code === "Digit0" || e.code === "Numpad0") return "reset";
+      return null;
+    };
+
+    function enableExpanded() {
+      // The page scales and pans as one layer, like a photo, instead of
+      // reflowing. A non-auto height turns off the quirks-mode rule that
+      // stretches <html> and <body> to the viewport, so their size is the content's.
+      const style = document.createElement("style");
+      style.textContent =
+        ":root{overflow:hidden;height:fit-content;transform-origin:0 0}" +
+        ":root>body{height:fit-content}";
+      document.head.append(style);
+      const root = document.documentElement;
+
+      let zoom = 1;
+      let x = 0;
+      let y = 0;
+      let width = 0;
+      let height = 0;
+      const measure = () => {
+        const transform = root.style.transform;
+        root.style.transform = "none";
+        width = Math.max(innerWidth, root.scrollWidth);
+        height = root.offsetHeight;
+        root.style.transform = transform;
+      };
+      // Smaller than the frame: centered. Larger: its edges stop at the frame's.
+      const clampAxis = (offset, size, view) =>
+        size <= view ? (view - size) / 2 : Math.min(0, Math.max(view - size, offset));
+      const apply = () => {
+        x = clampAxis(x, width * zoom, innerWidth);
+        y = clampAxis(y, height * zoom, innerHeight);
+        root.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+      };
+      const zoomAt = (clientX, clientY, next) => {
+        next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+        if (next === zoom) return;
+        x = clientX - ((clientX - x) * next) / zoom;
+        y = clientY - ((clientY - y) * next) / zoom;
+        zoom = next;
+        apply();
+      };
+      const zoomStep = (step) => {
+        if (step === "reset") {
+          zoom = 1;
+          x = 0;
+          y = 0;
+          apply();
+          return;
+        }
+        const factor = step === "in" ? KEY_ZOOM_FACTOR : 1 / KEY_ZOOM_FACTOR;
+        zoomAt(innerWidth / 2, innerHeight / 2, zoom * factor);
+      };
+      const relayout = () => {
+        measure();
+        apply();
+      };
+      relayout();
+      new ResizeObserver(relayout).observe(root);
+      addEventListener("resize", relayout);
+
+      // Scroll areas inside the embed keep their own scrolling.
+      const scrollsItself = (target, dx, dy) => {
+        for (
+          let el = target;
+          el instanceof Element && el !== document.body;
+          el = el.parentElement
+        ) {
+          const s = getComputedStyle(el);
+          const canY = dy < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight;
+          const canX = dx < 0 ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth;
+          if (dy && /auto|scroll/.test(s.overflowY) && canY) return true;
+          if (dx && /auto|scroll/.test(s.overflowX) && canX) return true;
+        }
+        return false;
+      };
+
+      addEventListener("keydown", (e) => {
+        if (e.defaultPrevented) return;
+        const step = zoomShortcutStep(e);
+        if (!step) return;
+        e.preventDefault();
+        zoomStep(step);
+      });
+      // WebKit reports a trackpad pinch as a Ctrl-wheel event; a plain wheel or
+      // two-finger scroll pans.
+      addEventListener(
+        "wheel",
+        (e) => {
+          if (e.defaultPrevented) return;
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            const sensitivity =
+              e.ctrlKey && !e.metaKey ? PINCH_ZOOM_SENSITIVITY : WHEEL_ZOOM_SENSITIVITY;
+            zoomAt(e.clientX, e.clientY, zoom * Math.exp(-e.deltaY * sensitivity));
+            return;
+          }
+          const unit = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1;
+          const dx = (e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX) * unit;
+          const dy = (e.shiftKey && !e.deltaX ? 0 : e.deltaY) * unit;
+          if (scrollsItself(e.target, dx, dy)) return;
+          e.preventDefault();
+          x -= dx;
+          y -= dy;
+          apply();
+        },
+        { passive: false },
+      );
+      addEventListener("message", (event) => {
+        const data = event.data;
+        if (event.source !== parent || data?.source !== "writer-embed" || data.type !== "zoom") {
+          return;
+        }
+        if (data.step === "in" || data.step === "out" || data.step === "reset") zoomStep(data.step);
+      });
+    }
 
     post({ type: "ready" });
   })();

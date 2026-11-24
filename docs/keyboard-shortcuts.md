@@ -34,7 +34,8 @@ list lasts until the window closes.
 Zoom scales the note text only, in preset stops (50–300%); the sidebar, tab
 strip, and status bar keep their size. The current percent is the global
 `editor.zoom` setting (Preferences → Editor → Zoom), restored on launch, and
-is multiplied on top of `editor.font-size`, which it never changes.
+is multiplied on top of `editor.font-size`, which it never changes. While an
+expanded embed is open, Cmd+= / Cmd+- / Cmd+0 zoom the embed instead.
 
 In compact single-file windows, sidebar and tab-management shortcuts do not
 create hidden UI state: Cmd+\\, Cmd+T, Cmd+Shift+T, Ctrl+Tab, Ctrl+Shift+Tab, and Cmd+1 ...

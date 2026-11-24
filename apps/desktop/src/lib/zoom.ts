@@ -42,6 +42,21 @@ export function zoomInFrom(current: unknown): number {
   return ZOOM_STEPS.find((stop) => stop > percent) ?? ZOOM_MAX;
 }
 
+export type ZoomStep = "in" | "out" | "reset";
+
+/** Cmd+= / Cmd++ / Cmd+numpad + zoom in, Cmd+- out, Cmd+0 resets. Alt chords
+ *  are left alone: Cmd+Alt+0 is the editor's "strip heading". The embed frame
+ *  (`src-tauri/src/embed-frame.html`) can't import this and keeps a copy. */
+export function zoomShortcutStep(
+  e: Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "altKey">,
+): ZoomStep | null {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey) return null;
+  if (e.key === "=" || e.key === "+" || e.code === "NumpadAdd") return "in";
+  if (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract") return "out";
+  if (e.key === "0" || e.code === "Digit0" || e.code === "Numpad0") return "reset";
+  return null;
+}
+
 /** Next stop strictly below the current value, clamped at the bottom. */
 export function zoomOutFrom(current: unknown): number {
   const percent = normalizeZoom(current);
